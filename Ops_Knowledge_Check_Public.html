@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ops Knowledge Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#12233F;
+    --navy-2:#1F4E78;
+    --amber:#D98E2B;
+    --amber-soft:#F6E4C2;
+    --green:#1E8A5B;
+    --green-soft:#E4F5EC;
+    --red:#C0392B;
+    --red-soft:#FBE6E3;
+    --bg:#F2F3F6;
+    --card:#FFFFFF;
+    --line:#E3E6EC;
+    --ink:#151B2B;
+    --ink-mute:#5B6579;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(18,35,63,0.06), 0 8px 24px rgba(18,35,63,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{font-family:'Sora',system-ui,sans-serif; letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .app{max-width:900px;margin:0 auto;padding:28px 20px 80px;}
+  .app.wide{max-width:1080px;}
+
+  /* ---- top bar ---- */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 20px;background:var(--navy);color:#fff;
+    position:sticky;top:0;z-index:50;
+  }
+  .topbar .brand{display:flex;align-items:center;gap:10px;font-family:'Sora';font-weight:700;font-size:15px;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);}
+  .topbar .meta{font-size:13px;color:#B9C4D6;}
+  .topbar .actions{display:flex;gap:10px;align-items:center;}
+  .link-btn{background:none;border:none;color:#CBD6E8;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-family:'Inter';}
+  .link-btn:hover{color:#fff;}
+
+  /* ---- generic card ---- */
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);}
+  .pad{padding:28px;}
+
+  /* ---- landing ---- */
+  .landing-wrap{display:flex;min-height:calc(100vh - 60px);align-items:center;justify-content:center;padding:40px 20px;}
+  .landing-card{max-width:480px;width:100%;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);font-weight:600;}
+  .landing-card h1{font-size:28px;margin:10px 0 6px;line-height:1.2;}
+  .landing-card p.sub{color:var(--ink-mute);font-size:14.5px;line-height:1.6;margin:0 0 24px;}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink);}
+  .field input{
+    width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;
+    font-size:15px;font-family:'Inter';background:#FBFBFD;
+  }
+  .field input:focus{outline:none;border-color:var(--navy-2);background:#fff;}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:13px 22px;border-radius:10px;font-weight:600;font-size:14.5px;
+    border:none;cursor:pointer;font-family:'Inter';transition:transform .08s ease, box-shadow .15s ease;
+  }
+  .btn-primary{background:var(--navy-2);color:#fff;width:100%;margin-top:18px;}
+  .btn-primary:hover{background:#173D5E;}
+  .btn-primary:disabled{background:#B9C2CE;cursor:not-allowed;}
+  .btn-primary:active{transform:scale(.99);}
+  .btn-ghost{background:transparent;color:var(--navy-2);border:1.5px solid var(--line);}
+  .btn-ghost:hover{border-color:var(--navy-2);}
+  .stat-row{display:flex;gap:18px;margin-top:22px;padding-top:20px;border-top:1px solid var(--line);}
+  .stat-row .s{flex:1;}
+  .stat-row .s .n{font-family:'Sora';font-weight:700;font-size:20px;color:var(--navy);}
+  .stat-row .s .l{font-size:11.5px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;}
+
+  /* ---- test screen ---- */
+  .progress-shell{
+    position:sticky;top:57px;z-index:40;background:var(--bg);
+    padding:14px 0 10px;
+  }
+  .progress-shell .inner{
+    display:flex;align-items:center;gap:14px;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:12px 16px;box-shadow:var(--shadow);
+  }
+  .progress-bar{flex:1;height:8px;background:#E9EBF0;border-radius:6px;overflow:hidden;}
+  .progress-bar .fill{height:100%;background:linear-gradient(90deg,var(--navy-2),var(--amber));border-radius:6px;transition:width .25s ease;}
+  .progress-count{font-family:'IBM Plex Mono';font-size:13px;color:var(--ink-mute);white-space:nowrap;}
+
+  .section-heading{
+    margin:34px 0 14px;display:flex;align-items:baseline;gap:10px;
+  }
+  .section-heading .idx{font-family:'IBM Plex Mono';font-size:12px;color:var(--amber);font-weight:600;}
+  .section-heading h2{font-size:17px;margin:0;color:var(--navy);}
+
+  .qcard{padding:22px 24px;margin-bottom:14px;}
+  .qcard .qtop{display:flex;gap:10px;align-items:flex-start;margin-bottom:4px;}
+  .qnum{font-family:'IBM Plex Mono';font-weight:600;color:var(--navy-2);font-size:14px;min-width:34px;}
+  .qtext{font-size:15px;line-height:1.55;font-weight:500;}
+  .qmodule{font-size:11.5px;color:var(--ink-mute);margin:6px 0 16px 44px;font-style:italic;}
+  .options{display:flex;flex-direction:column;gap:8px;margin-left:44px;}
+  .opt{
+    display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border:1.5px solid var(--line);
+    border-radius:9px;cursor:pointer;font-size:14px;line-height:1.5;transition:border-color .12s, background .12s;
+  }
+  .opt:hover{border-color:#AEB8CC;background:#FAFBFC;}
+  .opt.selected{border-color:var(--navy-2);background:#EEF3F8;}
+  .opt .letter{
+    width:22px;height:22px;border-radius:50%;border:1.5px solid #C6CCD6;display:flex;align-items:center;
+    justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;color:var(--ink-mute);font-family:'IBM Plex Mono';
+  }
+  .opt.selected .letter{background:var(--navy-2);border-color:var(--navy-2);color:#fff;}
+
+  .submit-bar{
+    position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);
+    padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+    margin:30px -20px -80px;box-shadow:0 -6px 18px rgba(0,0,0,0.04);
+  }
+  .submit-bar .note{font-size:13px;color:var(--ink-mute);}
+  .submit-bar .btn{width:auto;margin:0;}
+
+  /* ---- report screen ---- */
+  .score-hero{display:flex;gap:32px;align-items:center;padding:32px;flex-wrap:wrap;}
+  .gauge{position:relative;width:150px;height:150px;flex-shrink:0;}
+  .gauge svg{transform:rotate(-90deg);}
+  .gauge .center{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .gauge .pct{font-family:'Sora';font-weight:800;font-size:30px;}
+  .gauge .of{font-size:11px;color:var(--ink-mute);margin-top:-2px;}
+  .score-side h2{margin:0 0 6px;font-size:22px;}
+  .badge{
+    display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.04em;
+  }
+  .badge.pass{background:var(--green-soft);color:var(--green);}
+  .badge.fail{background:var(--red-soft);color:var(--red);}
+  .score-side p{color:var(--ink-mute);font-size:14px;margin:10px 0 0;max-width:420px;}
+
+  .breakdown{padding:26px 28px;}
+  .breakdown h3{margin:0 0 16px;font-size:15px;}
+  .bd-row{display:flex;align-items:center;gap:14px;margin-bottom:12px;}
+  .bd-row .label{width:230px;font-size:13px;color:var(--ink);flex-shrink:0;}
+  .bd-track{flex:1;height:10px;background:#EEF0F3;border-radius:6px;overflow:hidden;}
+  .bd-fill{height:100%;border-radius:6px;}
+  .bd-score{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--ink-mute);width:46px;text-align:right;}
+
+  .review-item{padding:20px 24px;margin-bottom:12px;border-left:4px solid var(--line);}
+  .review-item.correct{border-left-color:var(--green);}
+  .review-item.incorrect{border-left-color:var(--red);}
+  .review-item .rtop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+  .review-item .rq{font-size:14.5px;font-weight:500;line-height:1.5;}
+  .review-item .rmod{font-size:11px;color:var(--ink-mute);margin:4px 0 12px;font-style:italic;}
+  .r-status{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;padding:3px 9px;border-radius:12px;}
+  .r-status.correct{background:var(--green-soft);color:var(--green);}
+  .r-status.incorrect{background:var(--red-soft);color:var(--red);}
+  .ropt{font-size:13.5px;padding:8px 12px;border-radius:7px;margin-bottom:5px;display:flex;gap:8px;}
+  .ropt .l{font-family:'IBM Plex Mono';font-weight:700;font-size:12px;}
+  .ropt.your-wrong{background:var(--red-soft);color:#7A2E22;}
+  .ropt.correct-answer{background:var(--green-soft);color:#155C3D;}
+
+  .section-title-row{display:flex;align-items:center;justify-content:space-between;margin:30px 0 6px;}
+  .section-title-row h3{margin:0;font-size:16px;color:var(--navy);}
+  .filter-chip{font-size:12px;background:var(--card);border:1px solid var(--line);padding:6px 12px;border-radius:20px;cursor:pointer;color:var(--ink-mute);}
+  .filter-chip.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .filter-row{display:flex;gap:8px;margin:14px 0 6px;flex-wrap:wrap;}
+
+  /* ---- admin ---- */
+  .gate-wrap{display:flex;min-height:calc(100vh - 60px);align-items:center;justify-content:center;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+  .kpi{padding:20px;}
+  .kpi .n{font-family:'Sora';font-weight:800;font-size:26px;color:var(--navy);}
+  .kpi .l{font-size:12px;color:var(--ink-mute);margin-top:4px;}
+  table.admin-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.admin-table th{
+    text-align:left;padding:10px 14px;background:#F7F8FA;color:var(--ink-mute);
+    font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;
+    border-bottom:1.5px solid var(--line);
+  }
+  table.admin-table td{padding:12px 14px;border-bottom:1px solid var(--line);}
+  table.admin-table tr.clickable{cursor:pointer;}
+  table.admin-table tr.clickable:hover{background:#FAFBFD;}
+  .score-pill{font-family:'IBM Plex Mono';font-weight:600;padding:2px 8px;border-radius:6px;font-size:12.5px;}
+  .score-pill.pass{background:var(--green-soft);color:var(--green);}
+  .score-pill.fail{background:var(--red-soft);color:var(--red);}
+  .empty-state{padding:60px 20px;text-align:center;color:var(--ink-mute);}
+  .empty-state .big{font-size:34px;margin-bottom:10px;}
+  .weak-list{display:flex;flex-direction:column;gap:10px;}
+  .weak-list .wrow{display:flex;justify-content:space-between;font-size:13.5px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .weak-list .wrow:last-child{border-bottom:none;}
+  .back-link{font-size:13px;color:var(--navy-2);cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:16px;font-weight:600;}
+
+  /* ---- single-question test view ---- */
+  .qcounter{font-family:'IBM Plex Mono';font-size:13px;color:var(--navy);white-space:nowrap;}
+  .qcounter b{color:var(--navy-2);}
+  .navigator{
+    display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 18px;padding:14px;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+  }
+  .nav-dot{
+    width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-family:'IBM Plex Mono';font-size:12px;font-weight:600;color:var(--ink-mute);
+    border:1.5px solid var(--line);cursor:pointer;background:#FBFBFD;flex-shrink:0;
+    transition:transform .1s ease;
+  }
+  .nav-dot:hover{transform:scale(1.08);border-color:#AEB8CC;}
+  .nav-dot.answered{background:var(--green-soft);color:var(--green);border-color:var(--green);}
+  .nav-dot.current{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .section-tag{
+    font-family:'IBM Plex Mono';font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--amber);font-weight:600;margin:0 0 8px 2px;
+  }
+  .qcard-single{padding:28px 30px;margin-bottom:20px;}
+  .qcard-single .qtop{display:flex;gap:12px;align-items:flex-start;margin-bottom:6px;}
+  .qcard-single .qnum{font-family:'IBM Plex Mono';font-weight:700;color:var(--navy-2);font-size:15px;min-width:38px;}
+  .qcard-single .qtext{font-size:17px;line-height:1.6;font-weight:500;}
+  .qcard-single .qmodule{font-size:12px;color:var(--ink-mute);margin:8px 0 22px 50px;font-style:italic;}
+  .qcard-single .options{margin-left:50px;gap:10px;}
+  .qcard-single .opt{padding:14px 16px;font-size:14.5px;}
+  .nav-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    margin:8px 0 40px;flex-wrap:wrap;
+  }
+  .nav-bar .note{font-size:12.5px;color:var(--ink-mute);flex:1;text-align:center;min-width:180px;}
+  .nav-bar .btn-ghost{width:auto;}
+
+  @media (max-width:640px){
+    .score-hero{flex-direction:column;text-align:center;}
+    .qmodule,.options{margin-left:0;}
+    .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    .bd-row .label{width:140px;font-size:12px;}
+    .qcard-single{padding:20px;}
+    .qcard-single .qmodule,.qcard-single .options{margin-left:0;}
+    .nav-bar{flex-direction:column;}
+    .nav-bar .note{order:3;}
+    .nav-dot{width:26px;height:26px;font-size:11px;}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const QUESTIONS = [{"id": 1, "section": "Fee & Payment Configuration", "module": "Fee Configuration \u2014 Discount/Coupon", "question": "A client reports their coupon code is showing as \"invalid\" and the expected 20% discount isn't applying. On checking, you see a 5% concession is already reflected on the applicant's fee. What is most likely happening?", "options": ["The coupon module has a bug that fails to validate certain coupon formats", "A different coupon (from a bulk upload) was already applied, and it's calculated on the base fee at the time it was applied \u2014 if the fee was later revised upward, the concession amount won't auto-update", "The client entered the coupon code incorrectly", "Coupons can only be applied once per institute, so the second one was blocked"], "correct": 1}, {"id": 2, "section": "Fee & Payment Configuration", "module": "Fee or Payment \u2014 Form Payment", "question": "An applicant's Application Fee and Provisional Admission Fee show as approved with a \u20b90 amount instead of the expected fee value. What should you check first?", "options": ["Whether the payment gateway failed silently and recorded a false success", "Whether the applicant originally selected a course/program for which the fee was configured as zero, and later switched to a different course \u2014 the zero-fee record can carry over", "Whether the applicant is exempt from all fees by default", "Whether the fee field was left blank by the counsellor"], "correct": 1}, {"id": 3, "section": "Fee & Payment Configuration", "module": "Fee Configuration \u2014 Application Fee Configuration", "question": "A payment gateway (e.g., Billdesk) confirms a payment was successful, but Meritto still shows the payment as pending. What is a likely cause worth checking before escalating as a payment-integration defect?", "options": ["The payment gateway integration has a sync delay of several days", "The applicant's fee fields were edited/modified after the payment was already captured, creating a mismatch between the amount paid and the current fee configuration", "The client's bank rejected the transaction after initial approval", "Payments above a certain amount always require manual approval"], "correct": 1}, {"id": 4, "section": "Fee & Payment Configuration", "module": "Configurations or Permissions \u2014 Leads", "question": "A payment that was already marked offline/approved for an applicant later reverts to \"Payment Pending\" with no clear reason. What should you check in the applicant timeline before assuming this is a system defect?", "options": ["Whether the payment gateway retried and failed a second charge", "Whether the same user who approved the payment later reverted that approval \u2014 timeline/audit logs will show both actions", "Whether the applicant's session expired mid-payment", "Whether a bulk automation reset all payment statuses"], "correct": 1}, {"id": 5, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client has the Unique Mobile Number toggle enabled, but finds 2 lead records with the same mobile number. They assume the uniqueness validation is broken. What should you check first?", "options": ["Whether the two leads were created using the same mobile number but different email addresses (uniqueness is checked on the mobile+email combination, not mobile alone) \u2014 or whether a counsellor edited a lead's mobile number after creation", "Whether the Unique Mobile Number toggle was recently switched on (it doesn't apply retroactively) \u2014 not relevant here, so not the first thing to check", "Report it directly as a product bug since the toggle should block all duplicates", "Ask the client to delete one of the two leads manually without investigating"], "correct": 0}, {"id": 6, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Team and User", "question": "A client wants leads created by consultants/agents to always show \"Consultant\" in the source field. Some leads instead show a blank \"Created By\"/Agent Code field even though the source is Consultant. What is a likely explanation?", "options": ["The lead form was configured incorrectly", "The consultant/agent's user account is inactive \u2014 when the linked account is inactive, the Agent Code/Created By field does not get populated for leads routed through them", "Agent Code only populates for leads created via the mobile app", "This field is populated randomly and cannot be relied upon"], "correct": 1}, {"id": 7, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client reports that a lead's stage was modified by a user who is NOT the assigned owner of that lead, and asks how this was possible given access controls. What is a likely, non-bug explanation?", "options": ["Any user with login access can edit any lead regardless of ownership", "When an assigned counsellor is unavailable during an inbound call, another available counsellor may handle the call and update the lead \u2014 this cross-assignment during live-call handling is expected behavior", "The ownership field was corrupted during a data migration", "Non-owners can only view leads, never edit them, so this must be investigated as a critical bug"], "correct": 1}, {"id": 8, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Permission", "question": "A client asks how a specific lead was created via offline upload even though the user who created it did not have \"Bulk Upload\" permission enabled. What's the likely explanation?", "options": ["The permission system has a gap that must be reported as a bug", "The lead was not created through Bulk Upload at all \u2014 it was created via the separate \"Add Quick Lead\" option, which is governed by an independent permission from Bulk Upload", "Permissions only apply to web, not to mobile app uploads", "The user borrowed another colleague's login session"], "correct": 1}, {"id": 9, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Purge", "question": "A client cannot locate a specific paid application in the portal using either the application number or registered email, despite the applicant having completed payment. What is a possible root cause beyond \"the record is missing/deleted\"?", "options": ["The specific program/course the applicant applied under may lack a proper allocation automation, leaving applications for that program unassigned and effectively hidden from normal views", "Applications are automatically purged after 24 hours if unpaid", "Search only works for applications submitted in the last 7 days", "The application number format was entered with a typo and nothing else needs checking"], "correct": 0}, {"id": 10, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client is unable to download the full leads dump from Lead Manager despite other functionality working fine. What is the most likely non-bug explanation?", "options": ["The account has exceeded its total lead storage limit", "All records must be explicitly selected on the listing page before initiating a download \u2014 attempting to download without full selection causes it to fail", "Downloads only work between 9 AM and 6 PM", "The leads dump feature requires a separate paid add-on"], "correct": 1}, {"id": 11, "section": "Leads, Applications & Duplicate Handling", "module": "Form and Automation \u2014 Application Form", "question": "A client asks who deleted a specific lead and when, for internal audit purposes. What should the Ops team do before escalating this as unresolvable?", "options": ["Tell the client deleted records cannot be traced under any circumstances", "Check the purge/audit history \u2014 it retains the deleting user and timestamp (along with limited identifiers like email/mobile), so this can usually be answered directly without Product involvement", "Ask the client to re-create the lead manually and move on", "Escalate immediately to Product/RnD since audit trails aren't accessible to Ops"], "correct": 1}, {"id": 12, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client wants lead data to remain masked even when exported/downloaded by users who can view unmasked data on-screen. What is the current expected system behavior to communicate?", "options": ["Downloads are always masked regardless of screen-view permission, so this must be a bug", "Masking on export is tied to the same permission as on-screen masking \u2014 a user permitted to view unmasked data will also be able to download it unmasked; there's no independent \"mask on export only\" control", "Masking can be toggled separately per report but not per user", "Only Admin users can ever download unmasked data, regardless of permissions"], "correct": 1}, {"id": 13, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client reports an opportunity-to-lead automation didn't fire when a specific field was updated for the first time on a new opportunity. What is a key automation-trigger concept to check before treating this as a defect?", "options": ["Opportunity-based automations never work on first-time field population \u2014 for many field-update triggers, the very first time a field is populated is not treated as an \"update\" event, so the automation won't fire on a fresh record", "Automations only run once per day in a scheduled batch", "Opportunity automations require manual activation every time a new record is created", "The automation must have been accidentally disabled"], "correct": 0}, {"id": 14, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "An automation meant to trigger on a date-type field update (e.g., a test schedule slot) isn't firing even though the field clearly has a value. What subtlety commonly explains this?", "options": ["If the field's value was auto-populated by the system (rather than manually entered/selected by a user), it may not register as a qualifying \"update\" event for the automation trigger", "Date fields cannot be used as automation triggers under any configuration", "The automation engine has a known limitation with all date-type fields", "The trigger only works if the date is in the past, not the future"], "correct": 0}, {"id": 15, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A lead already assigned to a specific owner unexpectedly retains that same owner even after an allocation automation runs and should have reassigned it. What configuration detail explains this?", "options": ["The automation is configured using \"Add Logic\" allocation, which retains an existing owner (if outside the configured teams) alongside the new logic \u2014 switching to \"Override\" allocation would replace the existing owner instead", "Allocation automations can never reassign a lead that already has an owner, under any configuration", "The lead must be manually unassigned before any automation can act on it", "This only happens when the lead source is set to \"Offline\""], "correct": 0}, {"id": 16, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Drip Marketing", "question": "A client sees an automation-triggered email sent months after the underlying application stage was actually updated, and worries this signals a systemic delay bug. What scenario often explains a long-delayed trigger like this?", "options": ["The automation runs on a fixed monthly schedule regardless of trigger conditions", "If application stages are shared across multiple forms and the same lead has multiple applications, one form's stage update at a later date can cause all of the automation's conditions to become simultaneously true \u2014 triggering it late, once, for that shared condition set", "Emails are always queued for a minimum of 60 days before sending", "The lead's email address must have bounced repeatedly before finally going through"], "correct": 1}, {"id": 17, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "An automation is expected to auto-assign leads to owners, but leads from a specific channel remain unassigned. What is one commonly overlooked scoping detail to check?", "options": ["Whether the automation's trigger stage (e.g., only applies when Lead Stage = \"Untouched\") and any configured field-value conditions (e.g., specific program/course values) actually match the leads in question \u2014 leads outside that scope won't be picked up", "Whether the lead source field is capitalized correctly", "Whether the automation has run out of available executions for the month", "Whether the client's subscription tier supports automation"], "correct": 0}, {"id": 18, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client asks why opportunities for two specific institutes aren't getting auto-assigned per an existing automation, while other institutes work fine. What is a likely root cause to check?", "options": ["The automation itself must be broken for those two institutes specifically", "A required permission may be missing on the relevant role/permission set (e.g., Counsellor) for those specific accounts \u2014 enabling the permission is often all that's needed", "Opportunities can only be auto-assigned for a single institute at a time, by design", "The automation needs to be manually re-triggered for each opportunity individually"], "correct": 1}, {"id": 19, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client reports that the target audience count drops sharply once an automation reaches its WhatsApp communication node, even though the same audience qualified at an earlier email node. What two factors commonly explain this?", "options": ["Lead-level conditions are typically re-evaluated dynamically at each node (so a lead's status can change between nodes and drop it from later steps), and WhatsApp delivery does not support international phone numbers", "WhatsApp nodes have a hard cap of 100 recipients per automation run", "The audience list gets randomly shuffled at each node", "Email and WhatsApp nodes cannot share the same audience under any configuration"], "correct": 0}, {"id": 20, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client questions why an email automation didn't send for several applicants even though the trigger stage clearly changed for all of them. What should Ops check before assuming a systemic failure?", "options": ["Whether the automation also has additional field conditions beyond the stage trigger \u2014 in most such cases, the stage changed but underlying conditions weren't met, so no email was expected for those records", "Whether the client's account has been suspended", "Whether the applicants opted out of all communication globally", "Whether the automation only works for even-numbered application IDs"], "correct": 0}, {"id": 21, "section": "Integrations: Webhook / ERP", "module": "Integration \u2014 Webhook - ERP", "question": "A client reports the \"Bulk Push to Webhook\" feature isn't working for lead data at all. Before escalating as a defect, what configuration point should be verified?", "options": ["Whether the webhook is actually activated/enabled for the account, and whether push mode (manual vs automatic) matches what the client expects \u2014 pushes may need to be manually enabled and triggered", "Whether the client's ERP vendor has blacklisted the account", "Whether the internet connection at the client's office is stable", "Whether Bulk Push only supports CSV exports, not webhooks"], "correct": 0}, {"id": 22, "section": "Integrations: Webhook / ERP", "module": "Integration \u2014 Webhook - ERP", "question": "A client reports application fee amounts (instead of the agreed token fee) were pushed to their ERP, and some records were pushed more than once, during a specific date window. What operational cause is worth investigating first?", "options": ["The ERP system itself corrupted the incoming data", "The webhook's trigger point may have been temporarily and manually reconfigured (e.g., to push a few records that weren't going through normally) and not been fully/cleanly reverted afterward \u2014 causing re-pushes with the wrong data for that window", "Token fee and application fee are always pushed together by design", "The client's ERP field mapping was never set up"], "correct": 1}, {"id": 23, "section": "Publisher & Third-Party Source Integration", "module": "App and Extensions \u2014 Publisher Integration", "question": "A client is unable to create a Publisher panel user for a specific email ID, getting an error that the email already exists with a different user type/privilege. What's the likely explanation?", "options": ["The publisher panel has a random validation bug", "The email ID already exists in the system under a different entity/role (e.g., a standard user or a publisher user on a different account) \u2014 the system is correctly blocking a duplicate per its uniqueness rules", "Publisher accounts can only be created on weekdays", "The email provider is blocking account creation"], "correct": 1}, {"id": 24, "section": "Publisher & Third-Party Source Integration", "module": "App and Extensions \u2014 Publisher Integration", "question": "A client (via a publisher/agency) reports leads pushed via API aren't showing up on the dashboard/panel, or counts don't match what was sent. What is a common non-bug explanation?", "options": ["The leads were dropped somewhere in transit by the network", "The lead's source/campaign wasn't yet mapped/configured for that account, and/or the missing leads were filtered out as duplicates \u2014 both are visibility/configuration issues rather than data loss", "Publisher-sourced leads are capped at a fixed daily quota, by design", "The dashboard only refreshes once every 48 hours"], "correct": 1}, {"id": 25, "section": "WhatsApp / Communication Channels", "module": "App and Extensions \u2014 WABA", "question": "A client says they were told the WhatsApp Business template media upload limit is 15MB, but their videos (well under 15MB) are failing to upload. What's the correct explanation?", "options": ["WhatsApp Business Template limits are: Images 5MB, Videos 5MB, Documents 15MB \u2014 the 15MB figure applies to documents only, not videos", "Video uploads are not supported on WhatsApp Business templates at all", "The client's video file is corrupted", "15MB is correct for videos too; there is a temporary outage on Meta's end"], "correct": 0}, {"id": 26, "section": "WhatsApp / Communication Channels", "module": "Configurations or Permissions \u2014 Leads", "question": "A client cannot filter/search a WhatsApp communication using a specific Job ID that was generated via an automation. What should you clarify about the filter's scope?", "options": ["The Job ID filter in Lead Manager only supports bulk communication Job IDs, not automation-triggered communication Job IDs \u2014 this is a scope limitation, not a defect", "Job IDs expire after 24 hours and cannot be searched afterward", "Only Admin users can filter by Job ID", "WhatsApp Job IDs are not searchable under any circumstance"], "correct": 0}, {"id": 27, "section": "WhatsApp / Communication Channels", "module": "Form and Automation \u2014 Communication Template - Email/SMS/Waba", "question": "A client reports a specific email/SMS/WhatsApp communication did not go out at the exact time an automation should have triggered it, and no other errors are visible. What resource-related cause is worth checking first?", "options": ["Whether the communication credit balance (SMS/email credits) had been exhausted at the exact time the automation was set to trigger \u2014 insufficient balance blocks the send even if everything else is configured correctly", "Whether the recipient's number is registered on a Do Not Disturb list", "Whether the template contains any emoji, which can silently block sending", "Whether the automation ran on a public holiday"], "correct": 0}, {"id": 28, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Report and Dashboard", "question": "A client reports that leads shown against team members in a Productivity Report don't match the actual leads assigned to them in Lead Manager. What is a common, simple explanation to check before assuming a data sync bug?", "options": ["The report and Lead Manager may be using different default filters (e.g., the report defaulting to \"last 30 days\" while Lead Manager was viewed without that date range) \u2014 aligning the filters usually resolves the mismatch", "Productivity Reports only update once per week", "Lead Manager and Reports pull from two entirely separate databases that are never in sync", "Only Admin accounts see accurate productivity numbers"], "correct": 0}, {"id": 29, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Campaign and Tracking", "question": "A client sees different \"Paid Application\" counts across three different reports for the same period (e.g., Admin Dashboard vs. Campaign Manager vs. Lead Disposition Summary) and assumes a sync issue. What should you check?", "options": ["Whether each report has different inclusion criteria by design \u2014 for example, one report may exclude unmapped applications while others include them, explaining the count difference without any sync defect", "Whether the client is looking at data from two different financial years", "Whether one of the three reports has a caching bug that must be reported immediately", "Whether the client has permission to view all three reports simultaneously"], "correct": 0}, {"id": 30, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Report and Dashboard", "question": "A client reports a large discrepancy between inbound call counts shown in Lead Manager filters versus the raw telephony panel (e.g., Mcube) for the same period. What historical/setup factor is worth checking?", "options": ["Whether the agent phone numbers used for those calls were mapped in the telephony configuration at the time the calls were made \u2014 calls made before a mapping was set up won't reflect correctly in Lead Manager, even though the mapping now works going forward", "Whether the client is comparing calls across two different time zones", "Whether Lead Manager has a hard cap on the number of calls it can display", "Whether the telephony vendor is billing incorrectly"], "correct": 0}, {"id": 31, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Report and Dashboard", "question": "A client reports a dashboard widget for website page analytics isn't showing any data. Before escalating as a product defect, what is worth confirming with the client?", "options": ["Whether the tracking script/enquiry form is actually correctly placed and mapped on the specific landing page URLs being analyzed \u2014 the widget depends on that setup existing on each page", "Whether the client's website uses HTTPS", "Whether the widget only supports Google Analytics-linked accounts", "Whether the browser being used to view the dashboard is outdated"], "correct": 0}, {"id": 32, "section": "Reports & Dashboards", "module": "App and Extensions \u2014 Social Channel Connector", "question": "A client (via a publisher) can't find leads captured with campaign attribution changing across two visits (e.g., \"Secondary Campaign\" not updating despite a change in Medium or Campaign Name). What's the precise trigger condition to explain?", "options": ["The Secondary Campaign field is only captured/triggered when there is a change specifically in Campaign Source between two registrations \u2014 changes to Medium or Campaign Name alone won't trigger it", "Secondary Campaign only updates for leads from paid social platforms, never organic", "Secondary Campaign is a manual-entry-only field and can never populate automatically", "This field only updates once every 90 days regardless of activity"], "correct": 0}, {"id": 33, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Team and User", "question": "A client can't access a feature (e.g., Click-to-Call) on a user's panel even though it's enabled at the account/admin level. What additional layer should be checked?", "options": ["Enabling a feature at the account/admin level is sometimes not enough \u2014 certain features also require a device/app-level setting to be turned on for that specific user before it becomes visible/usable", "The feature must be re-purchased separately for each user", "The feature only activates after 30 days of account tenure", "Click-to-Call only works for users created in the last week"], "correct": 0}, {"id": 34, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Mobile App", "question": "A client suggests that counsellors should not be able to add notes on leads they don't own, and flags the current behavior (which allows it) as a bug. How should this be classified?", "options": ["This should be logged directly as a critical security bug and escalated urgently", "This is existing, intended system behavior \u2014 not every disagreement with current behavior is a defect; this should be treated as a feature enhancement request and routed to Product for prioritization, not as a bug", "This can be fixed instantly by disabling the Notes feature entirely", "This only happens on the mobile app and is irrelevant to web users"], "correct": 1}, {"id": 35, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Echo", "question": "A client can't see conversation responses on an integrated chat tool (e.g., Echo) for certain users, sometimes getting a 404 error. What configuration nuance might explain this?", "options": ["When WhatsApp Business (WABA) is configured on a specific extension, priority is given to that extension configuration for showing responses \u2014 this is expected behavior tied to how the extension is set up, not a defect", "Echo requires a separate license per user to view any response", "404 errors always indicate the account has been deleted", "Echo responses are only visible to the original creator of the conversation"], "correct": 0}, {"id": 36, "section": "Access, Permissions & Feature Scope", "module": "Form and Automation \u2014 Application Form", "question": "A client reports an application/form's completion status appears inconsistent \u2014 some records show \"Completed\" after finishing only part of a multi-part form, while records that finished the true final part show \"In Progress.\" What configuration detail explains this?", "options": ["The form-completion trigger may be configured against an earlier part (e.g., Part 1) instead of the actual final part of the client's process (e.g., Part 2) \u2014 aligning the trigger with the correct final step resolves the mismatch", "Form completion status is randomly assigned and cannot be relied upon", "Completion status only updates once every 24 hours", "Multi-part forms are not supported and always show incorrect status"], "correct": 0}, {"id": 37, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Mobile App", "question": "A client sees a stage/option (e.g., a specific application stage) rendering differently between the mobile app and web for the same lead. What's a likely explanation before assuming a mobile app defect?", "options": ["On web, if only one application form is available it may get auto-selected and shown by default, whereas mobile may require the user to explicitly select the form first \u2014 leading to an apparent difference until the correct form is chosen", "The mobile app only supports half the features of the web platform, by design", "Application stages sync between mobile and web only once per day", "This always indicates the mobile app version is outdated"], "correct": 0}, {"id": 38, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Permission", "question": "A client reports a user is suddenly seeing admin-like options (e.g., reassign, broader visibility) that they shouldn't have, despite nothing being intentionally changed. What should be checked first?", "options": ["Immediately assume a security breach and lock the entire account", "Review the user's current role/permission configuration \u2014 an unintended permission change (even one made internally) can grant broader access than intended, and correcting the role setting resolves it", "This is expected behavior for all users after 90 days", "Admin-like options appear randomly and are purely cosmetic"], "correct": 1}, {"id": 39, "section": "Domain, DNS & Environment Configuration", "module": "Configurations or Permissions \u2014 Team and User (Domain/DNS Configuration)", "question": "A client reports being unable to activate their account, or that a registration/verification link doesn't redirect correctly \u2014 and this started right after they changed their company's domain or subdomain. What is the most likely root cause?", "options": ["The account itself has been deactivated at the backend \u2014 request Product to reactivate it", "The required DNS records (e.g., CNAME) were not updated/propagated on the client's domain side after the change \u2014 sharing/re-configuring the correct DNS records resolves it", "There's a temporary server outage affecting all activation emails", "The user's email inbox is full and can't receive new emails"], "correct": 1}, {"id": 40, "section": "Domain, DNS & Environment Configuration", "module": "App and Extensions \u2014 Telephony", "question": "A client's telephony call logs show call duration but the calls aren't reflecting in the lead/candidate timeline. What setup-related possibility should be checked?", "options": ["Whether the account's telephony setup is still on an older/legacy configuration in the system rather than the current one \u2014 migrating to the current configuration is often the fix", "Whether the telephony vendor has gone out of business", "Whether call logs are only visible on weekdays", "Whether the candidate's number was entered with a country code"], "correct": 0}];
+
+// ---------- Config ----------
+// PASTE your deployed Apps Script Web App URL below (ends in /exec)
+const BACKEND_URL = "https://script.google.com/a/macros/meritto.com/s/AKfycbzeVf_4QSXQZYR8oBw5uZphTDG6BaF3Pky0OQgbj8240rHbX3TK2WiPWxg98_xmaMhP/exec";
+
+const PASS_PCT = 80;
+const ADMIN_CODE = "meritto2026";
+const LETTERS = ["A","B","C","D"];
+
+const SECTIONS = [...new Set(QUESTIONS.map(q => q.section))];
+const TOTAL_Q = QUESTIONS.length;
+
+const state = {
+  view: "landing",          // landing | test | report | admin-gate | admin | config-missing
+  name: "",
+  answers: {},
+  currentIndex: 0,
+  result: null,
+  reviewFilter: "all",
+  adminUnlocked: false,
+  adminCodeInput: "",
+  adminError: false,
+  submissions: [],
+  adminLoading: true,
+  selectedSubmissionIdx: null,
+  resumeChecked: false,
+  resumeData: null,
+};
+
+// ---------- Client identity (anonymous, no login) ----------
+function getClientId(){
+  let id;
+  try { id = localStorage.getItem('ops_quiz_client_id'); } catch(e) { id = null; }
+  if (!id){
+    id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
+    try { localStorage.setItem('ops_quiz_client_id', id); } catch(e) {}
+  }
+  return id;
+}
+const CLIENT_ID = getClientId();
+
+// ---------- Backend API helpers ----------
+async function apiGet(params){
+  const url = BACKEND_URL + '?' + new URLSearchParams(params).toString();
+  const res = await fetch(url);
+  return await res.json();
+}
+
+async function apiPost(payload){
+  const res = await fetch(BACKEND_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // keeps this a CORS "simple request"
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
+}
+
+function backendConfigured(){
+  return BACKEND_URL && BACKEND_URL.indexOf('PASTE_YOUR') === -1;
+}
+
+async function loadSubmissions() {
+  try {
+    const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE });
+    return data.submissions || [];
+  } catch (e) { return []; }
+}
+
+async function saveSubmissionRemote(name, result) {
+  await apiPost({ action: 'submit', clientId: CLIENT_ID, name: name, result: result });
+}
+
+async function loadProgress(){
+  try {
+    const data = await apiGet({ action: 'getProgress', clientId: CLIENT_ID });
+    if (data && data.found) {
+      return { name: data.name, answers: data.answers, currentIndex: data.currentIndex, timestamp: data.timestamp };
+    }
+    return null;
+  } catch (e) { return null; }
+}
+
+async function saveProgress(){
+  try {
+    await apiPost({
+      action: 'saveProgress',
+      clientId: CLIENT_ID,
+      name: state.name,
+      answers: state.answers,
+      currentIndex: state.currentIndex
+    });
+  } catch(e) { /* non-fatal */ }
+}
+
+async function clearProgress(){
+  try { await apiPost({ action: 'clearProgress', clientId: CLIENT_ID }); } catch(e) { /* non-fatal */ }
+}
+
+// ---------- Scoring ----------
+function computeResult(answers) {
+  let correctCount = 0;
+  const perQuestion = [];
+  const sectionMap = {};
+  SECTIONS.forEach(s => sectionMap[s] = {correct:0, total:0});
+
+  QUESTIONS.forEach(q => {
+    const chosen = answers[q.id];
+    const isCorrect = chosen === q.correct;
+    if (isCorrect) correctCount++;
+    sectionMap[q.section].total++;
+    if (isCorrect) sectionMap[q.section].correct++;
+    perQuestion.push({
+      id: q.id, section: q.section, module: q.module, question: q.question,
+      options: q.options, correctIndex: q.correct, chosenIndex: chosen, isCorrect
+    });
+  });
+
+  const total = QUESTIONS.length;
+  const pct = Math.round((correctCount/total)*100);
+  return {
+    correctCount, total, pct,
+    pass: pct >= PASS_PCT,
+    sectionScores: SECTIONS.map(s => ({ section: s, ...sectionMap[s], pct: Math.round((sectionMap[s].correct/sectionMap[s].total)*100) })),
+    perQuestion,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) + ' ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+}
+
+function scoreColor(pct){
+  if (pct >= PASS_PCT) return 'var(--green)';
+  if (pct >= 60) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+// ---------- Views ----------
+
+function renderTopbar(showBack){
+  return `
+    <div class="topbar">
+      <div class="brand"><span class="dot"></span> Ops Knowledge Check</div>
+      <div class="actions">
+        ${showBack ? `<button class="link-btn" onclick="goHome()">Exit</button>` : `<button class="link-btn" onclick="goAdmin()">Team Report</button>`}
+      </div>
+    </div>`;
+}
+
+function renderConfigMissing(){
+  return `
+    ${renderTopbar(false)}
+    <div class="landing-wrap">
+      <div class="card landing-card pad">
+        <div class="eyebrow" style="color:var(--red);">Setup needed</div>
+        <h1 style="font-size:20px;">Backend URL not configured</h1>
+        <p class="sub">
+          This page needs the Apps Script Web App URL pasted into the <code>BACKEND_URL</code>
+          constant near the top of the script before it can save progress or results.
+          Open this HTML file in a text editor, replace
+          <code>PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE</code> with your deployed
+          <code>/exec</code> URL, save, and re-upload/host it again.
+        </p>
+      </div>
+    </div>`;
+}
+
+function renderLanding(){
+  if (!state.resumeChecked){
+    return `${renderTopbar(false)}<div class="landing-wrap"><div class="empty-state">Loading…</div></div>`;
+  }
+
+  const resumeCard = state.resumeData ? `
+    <div class="card landing-card pad" style="margin-bottom:16px;border-color:var(--amber);background:#FFFBF3;">
+      <div class="eyebrow" style="color:var(--navy-2);">In-progress test found</div>
+      <h1 style="font-size:19px;margin:8px 0 4px;">Welcome back${state.resumeData.name ? ', ' + escapeHtml(state.resumeData.name) : ''}</h1>
+      <p class="sub" style="margin-bottom:16px;">
+        You have ${Object.keys(state.resumeData.answers||{}).length} of ${TOTAL_Q} questions answered,
+        last saved ${fmtDate(state.resumeData.timestamp)}.
+      </p>
+      <button class="btn btn-primary" onclick="resumeTest()">Resume where I left off →</button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px;" onclick="discardResume()">Start over instead</button>
+    </div>` : '';
+
+  return `
+    ${renderTopbar(false)}
+    <div class="landing-wrap">
+      <div style="max-width:480px;width:100%;">
+        ${resumeCard}
+        ${!state.resumeData ? `
+        <div class="card landing-card pad">
+          <div class="eyebrow">Product &amp; Ops Enablement</div>
+          <h1>Distinguishing Real Bugs from Ops-End Gaps</h1>
+          <p class="sub">40 real cases that were parked to Product as suspected bugs but turned out to be configuration, permission, or process understanding gaps. Read each scenario and pick the best explanation. You can leave and resume anytime — your progress is saved automatically.</p>
+          <div class="field">
+            <label>Your full name</label>
+            <input id="nameInput" type="text" placeholder="e.g. Priya Sharma" value="${escapeHtml(state.name)}" oninput="state.name=this.value" onkeydown="if(event.key==='Enter')startTest()"/>
+          </div>
+          <button class="btn btn-primary" onclick="startTest()">Begin Assessment →</button>
+          <div class="stat-row">
+            <div class="s"><div class="n">40</div><div class="l">Questions</div></div>
+            <div class="s"><div class="n">~25</div><div class="l">Minutes</div></div>
+            <div class="s"><div class="n">${PASS_PCT}%</div><div class="l">Pass mark</div></div>
+          </div>
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderNavigator(){
+  let dots = "";
+  QUESTIONS.forEach((q, i) => {
+    const answered = state.answers[q.id] !== undefined;
+    const isCurrent = i === state.currentIndex;
+    let cls = "nav-dot";
+    if (isCurrent) cls += " current";
+    else if (answered) cls += " answered";
+    dots += `<div class="${cls}" onclick="jumpToQuestion(${i})" title="Question ${i+1}${answered?' — answered':''}">${i+1}</div>`;
+  });
+  return `<div class="navigator">${dots}</div>`;
+}
+
+function renderTest(){
+  const q = QUESTIONS[state.currentIndex];
+  const chosen = state.answers[q.id];
+  const answeredCount = Object.keys(state.answers).length;
+  const isLast = state.currentIndex === TOTAL_Q - 1;
+  const isFirst = state.currentIndex === 0;
+
+  let optsHtml = "";
+  q.options.forEach((opt, i) => {
+    optsHtml += `
+      <div class="opt ${chosen===i?'selected':''}" onclick="selectOption(${q.id},${i})">
+        <div class="letter">${LETTERS[i]}</div>
+        <div>${escapeHtml(opt)}</div>
+      </div>`;
+  });
+
+  return `
+    ${renderTopbar(true)}
+    <div class="app">
+      <div class="progress-shell">
+        <div class="inner">
+          <div class="qcounter">Question <b>${state.currentIndex+1}</b> of ${TOTAL_Q}</div>
+          <div class="progress-bar"><div class="fill" style="width:${Math.round((answeredCount/TOTAL_Q)*100)}%"></div></div>
+          <div class="progress-count">${answeredCount} / ${TOTAL_Q} answered</div>
+        </div>
+      </div>
+
+      ${renderNavigator()}
+
+      <div class="section-tag">${escapeHtml(q.section)}</div>
+      <div class="card qcard-single">
+        <div class="qtop">
+          <div class="qnum">Q${q.id}</div>
+          <div class="qtext">${escapeHtml(q.question)}</div>
+        </div>
+        <div class="qmodule">Related Module: ${escapeHtml(q.module)}</div>
+        <div class="options">${optsHtml}</div>
+      </div>
+
+      <div class="nav-bar">
+        <button class="btn btn-ghost" ${isFirst ? 'disabled style="opacity:.4;pointer-events:none;"' : ''} onclick="goPrev()">← Previous</button>
+        <div class="note">Answers save automatically — you can close this tab and resume later.</div>
+        ${isLast
+          ? `<button class="btn btn-primary" style="width:auto;margin:0;" onclick="attemptSubmit()">Submit Test</button>`
+          : `<button class="btn btn-primary" style="width:auto;margin:0;" onclick="goNext()">Next →</button>`}
+      </div>
+    </div>`;
+}
+
+function renderGauge(pct){
+  const r = 62, c = 2*Math.PI*r;
+  const off = c - (pct/100)*c;
+  const col = scoreColor(pct);
+  return `
+    <div class="gauge">
+      <svg width="150" height="150" viewBox="0 0 150 150">
+        <circle cx="75" cy="75" r="${r}" fill="none" stroke="#EEF0F3" stroke-width="12"/>
+        <circle cx="75" cy="75" r="${r}" fill="none" stroke="${col}" stroke-width="12"
+          stroke-dasharray="${c}" stroke-dashoffset="${off}" stroke-linecap="round"/>
+      </svg>
+      <div class="center">
+        <div class="pct" style="color:${col}">${pct}%</div>
+        <div class="of">score</div>
+      </div>
+    </div>`;
+}
+
+function renderBreakdown(sectionScores){
+  let rows = "";
+  sectionScores.forEach(s => {
+    const col = scoreColor(s.pct);
+    rows += `
+      <div class="bd-row">
+        <div class="label">${escapeHtml(s.section)}</div>
+        <div class="bd-track"><div class="bd-fill" style="width:${s.pct}%;background:${col}"></div></div>
+        <div class="bd-score">${s.correct}/${s.total}</div>
+      </div>`;
+  });
+  return `<div class="card breakdown"><h3>Performance by section</h3>${rows}</div>`;
+}
+
+function renderReviewList(perQuestion, filter){
+  const filtered = perQuestion.filter(q => filter==='all' ? true : (filter==='incorrect' ? !q.isCorrect : q.isCorrect));
+  if (filtered.length === 0){
+    return `<div class="empty-state"><div class="big">✓</div>Nothing to show for this filter.</div>`;
+  }
+  return filtered.map(q => {
+    const yourOpt = q.chosenIndex;
+    return `
+      <div class="review-item card ${q.isCorrect?'correct':'incorrect'}">
+        <div class="rtop">
+          <div>
+            <div class="rq">Q${q.id}. ${escapeHtml(q.question)}</div>
+            <div class="rmod">Related Module: ${escapeHtml(q.module)}</div>
+          </div>
+          <div class="r-status ${q.isCorrect?'correct':'incorrect'}">${q.isCorrect?'Correct':'Incorrect'}</div>
+        </div>
+        ${!q.isCorrect && yourOpt !== undefined ? `<div class="ropt your-wrong"><span class="l">${LETTERS[yourOpt]}</span> ${escapeHtml(q.options[yourOpt])} — your answer</div>` : ''}
+        <div class="ropt correct-answer"><span class="l">${LETTERS[q.correctIndex]}</span> ${escapeHtml(q.options[q.correctIndex])} — correct answer</div>
+      </div>`;
+  }).join("");
+}
+
+function renderReport(){
+  const r = state.result;
+  return `
+    ${renderTopbar(true)}
+    <div class="app">
+      <div class="card score-hero">
+        ${renderGauge(r.pct)}
+        <div class="score-side">
+          <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
+          <h2 style="margin-top:10px;">${escapeHtml(state.name)}, you scored ${r.correctCount} / ${r.total}</h2>
+          <p>${r.pass
+            ? "Strong grasp of the ops-vs-bug patterns covered. Review any missed items below to close the remaining gaps."
+            : `Pass mark is ${PASS_PCT}%. Review the incorrect answers below — each one links back to a real pattern worth remembering before parking similar cases to Product.`}</p>
+        </div>
+      </div>
+
+      ${renderBreakdown(r.sectionScores)}
+
+      <div class="section-title-row">
+        <h3>Review your answers</h3>
+      </div>
+      <div class="filter-row">
+        <div class="filter-chip ${state.reviewFilter==='all'?'active':''}" onclick="setReviewFilter('all')">All (${r.total})</div>
+        <div class="filter-chip ${state.reviewFilter==='incorrect'?'active':''}" onclick="setReviewFilter('incorrect')">Incorrect (${r.total-r.correctCount})</div>
+        <div class="filter-chip ${state.reviewFilter==='correct'?'active':''}" onclick="setReviewFilter('correct')">Correct (${r.correctCount})</div>
+      </div>
+      <div style="margin-top:14px;">
+        ${renderReviewList(r.perQuestion, state.reviewFilter)}
+      </div>
+    </div>`;
+}
+
+function renderAdminGate(){
+  return `
+    ${renderTopbar(true)}
+    <div class="gate-wrap">
+      <div class="card landing-card pad">
+        <div class="eyebrow">Manager Access</div>
+        <h1 style="font-size:22px;">Team Performance Report</h1>
+        <p class="sub">Enter the access code to view aggregated team results.</p>
+        <div class="field">
+          <label>Access code</label>
+          <input type="password" value="${escapeHtml(state.adminCodeInput)}" oninput="state.adminCodeInput=this.value" onkeydown="if(event.key==='Enter')checkAdminCode()"/>
+        </div>
+        ${state.adminError ? `<div style="color:var(--red);font-size:13px;margin-top:8px;">Incorrect code. Try again.</div>` : ''}
+        <button class="btn btn-primary" onclick="checkAdminCode()">Unlock</button>
+      </div>
+    </div>`;
+}
+
+function renderAdminDetail(sub){
+  const r = sub.result;
+  return `
+    <div class="back-link" onclick="state.selectedSubmissionIdx=null; render()">← Back to all results</div>
+    <div class="card score-hero">
+      ${renderGauge(r.pct)}
+      <div class="score-side">
+        <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
+        <h2 style="margin-top:10px;">${escapeHtml(sub.name)} — ${r.correctCount} / ${r.total}</h2>
+        <p>Submitted ${fmtDate(sub.timestamp)}</p>
+      </div>
+    </div>
+    ${renderBreakdown(r.sectionScores)}
+    <div class="section-title-row"><h3>Answer detail</h3></div>
+    <div style="margin-top:14px;">${renderReviewList(r.perQuestion, 'all')}</div>
+  `;
+}
+
+function renderAdmin(){
+  if (state.adminLoading){
+    return `${renderTopbar(true)}<div class="app"><div class="empty-state">Loading team results…</div></div>`;
+  }
+
+  if (state.selectedSubmissionIdx !== null){
+    const sub = state.submissions[state.selectedSubmissionIdx];
+    return `${renderTopbar(true)}<div class="app wide">${renderAdminDetail(sub)}</div>`;
+  }
+
+  const subs = state.submissions;
+  if (subs.length === 0){
+    return `${renderTopbar(true)}<div class="app wide">
+      <div class="empty-state card pad">
+        <div class="big">📋</div>
+        No submissions yet. Share this test link with your team — results will appear here as they complete it.
+      </div>
+    </div>`;
+  }
+
+  const avgPct = Math.round(subs.reduce((a,s)=>a+s.result.pct,0)/subs.length);
+  const passCount = subs.filter(s=>s.result.pass).length;
+  const passRate = Math.round((passCount/subs.length)*100);
+
+  const secAgg = {};
+  SECTIONS.forEach(s => secAgg[s] = {correct:0,total:0});
+  subs.forEach(s => s.result.sectionScores.forEach(ss => {
+    secAgg[ss.section].correct += ss.correct;
+    secAgg[ss.section].total += ss.total;
+  }));
+  const weakSections = SECTIONS.map(s => ({
+    section: s,
+    pct: Math.round((secAgg[s].correct/secAgg[s].total)*100)
+  })).sort((a,b)=>a.pct-b.pct);
+
+  const rows = subs.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map((s) => {
+    const realIdx = subs.indexOf(s);
+    return `
+      <tr class="clickable" onclick="state.selectedSubmissionIdx=${realIdx}; render()">
+        <td>${escapeHtml(s.name)}</td>
+        <td class="mono">${fmtDate(s.timestamp)}</td>
+        <td>${s.result.correctCount} / ${s.result.total}</td>
+        <td><span class="score-pill ${s.result.pass?'pass':'fail'}">${s.result.pct}%</span></td>
+        <td>${s.result.pass ? 'Passed' : 'Needs review'}</td>
+      </tr>`;
+  }).join("");
+
+  const weakHtml = weakSections.slice(0,5).map(w => `
+    <div class="wrow">
+      <span>${escapeHtml(w.section)}</span>
+      <span class="mono" style="color:${scoreColor(w.pct)};font-weight:600;">${w.pct}%</span>
+    </div>`).join("");
+
+  return `
+    ${renderTopbar(true)}
+    <div class="app wide">
+      <h2 style="margin-bottom:4px;">Team Performance</h2>
+      <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${subs.length} submission${subs.length!==1?'s':''} recorded</p>
+
+      <div class="kpi-grid">
+        <div class="card kpi"><div class="n">${subs.length}</div><div class="l">Team members tested</div></div>
+        <div class="card kpi"><div class="n">${avgPct}%</div><div class="l">Average score</div></div>
+        <div class="card kpi"><div class="n">${passRate}%</div><div class="l">Pass rate (≥${PASS_PCT}%)</div></div>
+        <div class="card kpi"><div class="n">${passCount}/${subs.length}</div><div class="l">Passed the assessment</div></div>
+      </div>
+
+      <div class="card pad" style="margin-bottom:24px;">
+        <h3 style="margin:0 0 14px;font-size:15px;">Lowest-scoring sections across the team</h3>
+        <div class="weak-list">${weakHtml}</div>
+      </div>
+
+      <div class="card" style="overflow:hidden;">
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>Submitted</th><th>Score</th><th>%</th><th>Result</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+// ---------- Event handlers ----------
+function render(){
+  document.getElementById("root").innerHTML =
+    state.view === "config-missing" ? renderConfigMissing() :
+    state.view === "landing" ? renderLanding() :
+    state.view === "test" ? renderTest() :
+    state.view === "report" ? renderReport() :
+    state.view === "admin-gate" ? renderAdminGate() :
+    state.view === "admin" ? renderAdmin() : "";
+}
+
+async function checkResume(){
+  const data = await loadProgress();
+  if (data && data.answers && Object.keys(data.answers).length > 0){
+    state.resumeData = data;
+  }
+  state.resumeChecked = true;
+  render();
+}
+
+function resumeTest(){
+  state.name = state.resumeData.name || "";
+  state.answers = state.resumeData.answers || {};
+  state.currentIndex = Math.min(state.resumeData.currentIndex || 0, TOTAL_Q - 1);
+  state.resumeData = null;
+  state.view = "test";
+  render();
+  window.scrollTo(0,0);
+}
+
+async function discardResume(){
+  await clearProgress();
+  state.resumeData = null;
+  render();
+}
+
+function startTest(){
+  if (!state.name.trim()){
+    alert("Please enter your name to begin.");
+    return;
+  }
+  state.answers = {};
+  state.currentIndex = 0;
+  state.view = "test";
+  render();
+  window.scrollTo(0,0);
+  saveProgress();
+}
+
+function selectOption(qid, idx){
+  state.answers[qid] = idx;
+  render();
+  saveProgress();
+}
+
+function goNext(){
+  if (state.currentIndex < TOTAL_Q - 1){
+    state.currentIndex++;
+    render();
+    window.scrollTo(0,0);
+    saveProgress();
+  }
+}
+
+function goPrev(){
+  if (state.currentIndex > 0){
+    state.currentIndex--;
+    render();
+    window.scrollTo(0,0);
+    saveProgress();
+  }
+}
+
+function jumpToQuestion(idx){
+  state.currentIndex = idx;
+  render();
+  window.scrollTo(0,0);
+  saveProgress();
+}
+
+function attemptSubmit(){
+  const answeredCount = Object.keys(state.answers).length;
+  if (answeredCount < TOTAL_Q){
+    const firstUnanswered = QUESTIONS.findIndex(q => state.answers[q.id] === undefined);
+    if (!confirm(`You still have ${TOTAL_Q - answeredCount} unanswered question(s). Go to the first unanswered question?`)){
+      return;
+    }
+    state.currentIndex = firstUnanswered;
+    render();
+    window.scrollTo(0,0);
+    return;
+  }
+  submitTest();
+}
+
+async function submitTest(){
+  const result = computeResult(state.answers);
+  state.result = result;
+  state.view = "report";
+  render();
+  window.scrollTo(0,0);
+  try {
+    await saveSubmissionRemote(state.name, result);
+  } catch(e) { /* still show the report even if save fails */ }
+}
+
+function setReviewFilter(f){
+  state.reviewFilter = f;
+  render();
+}
+
+function goHome(){
+  state.view = "landing";
+  state.answers = {};
+  state.result = null;
+  state.currentIndex = 0;
+  render();
+  checkResume();
+}
+
+function goAdmin(){
+  state.view = state.adminUnlocked ? "admin" : "admin-gate";
+  state.selectedSubmissionIdx = null;
+  render();
+  if (state.adminUnlocked) loadAdminData();
+}
+
+async function checkAdminCode(){
+  if (state.adminCodeInput === ADMIN_CODE){
+    state.adminUnlocked = true;
+    state.adminError = false;
+    state.view = "admin";
+    render();
+    loadAdminData();
+  } else {
+    state.adminError = true;
+    render();
+  }
+}
+
+async function loadAdminData(){
+  state.adminLoading = true;
+  render();
+  const subs = await loadSubmissions();
+  state.submissions = subs;
+  state.adminLoading = false;
+  render();
+}
+
+// ---------- Init ----------
+if (!backendConfigured()){
+  state.view = "config-missing";
+  render();
+} else {
+  render();
+  checkResume();
+}
+</script>
+</body>
+</html>
