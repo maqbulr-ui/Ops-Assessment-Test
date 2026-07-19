@@ -277,6 +277,9 @@ const state = {
   selectedSubmissionIdx: null,
   resumeChecked: false,
   resumeData: null,
+  checkingName: false,
+  priorSubmission: null,
+  viewingPastResult: false,
 };
 
 // ---------- Client identity (anonymous, no login) ----------
@@ -316,6 +319,14 @@ async function loadSubmissions() {
     const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE });
     return data.submissions || [];
   } catch (e) { return []; }
+}
+
+async function checkPriorSubmission(name) {
+  try {
+    const data = await apiGet({ action: 'getSubmissionByName', name: name });
+    if (data && data.found) return data.submission;
+    return null;
+  } catch (e) { return null; }
 }
 
 async function saveSubmissionRemote(name, result) {
@@ -451,16 +462,35 @@ function renderLanding(){
           <h1>Distinguishing Real Bugs from Ops-End Gaps</h1>
           <p class="sub">40 real cases that were parked to Product as suspected bugs but turned out to be configuration, permission, or process understanding gaps. Read each scenario and pick the best explanation. You can leave and resume anytime — your progress is saved automatically.</p>
           <div class="field">
-            <label>Your full name</label>
-            <input id="nameInput" type="text" placeholder="e.g. Priya Sharma" value="${escapeHtml(state.name)}" oninput="state.name=this.value" onkeydown="if(event.key==='Enter')startTest()"/>
+            <label>Your work email address</label>
+            <input id="nameInput" type="email" placeholder="e.g. priya.sharma@meritto.com" value="${escapeHtml(state.name)}" oninput="state.name=this.value" onkeydown="if(event.key==='Enter')startTest()"/>
           </div>
-          <button class="btn btn-primary" onclick="startTest()">Begin Assessment →</button>
+          <button class="btn btn-primary" ${state.checkingName ? 'disabled style="opacity:.6;"' : ''} onclick="startTest()">${state.checkingName ? 'Checking…' : 'Begin Assessment →'}</button>
           <div class="stat-row">
             <div class="s"><div class="n">40</div><div class="l">Questions</div></div>
             <div class="s"><div class="n">~25</div><div class="l">Minutes</div></div>
             <div class="s"><div class="n">${PASS_PCT}%</div><div class="l">Pass mark</div></div>
           </div>
         </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderPriorChoice(){
+  const sub = state.priorSubmission;
+  const r = sub.result;
+  return `
+    ${renderTopbar(false)}
+    <div class="landing-wrap">
+      <div class="card landing-card pad">
+        <div class="eyebrow" style="color:var(--navy-2);">Previous submission found</div>
+        <h1 style="font-size:19px;margin:8px 0 4px;">Welcome back, ${escapeHtml(sub.name)}</h1>
+        <p class="sub" style="margin-bottom:18px;">
+          You already completed this assessment on ${fmtDate(sub.timestamp)}, scoring
+          <b>${r.correctCount} / ${r.total} (${r.pct}%)</b>.
+        </p>
+        <button class="btn btn-primary" onclick="viewPriorResult()">View my result →</button>
+        <button class="btn btn-ghost" style="width:100%;margin-top:10px;" onclick="retakeFromPrior()">Retake the assessment</button>
       </div>
     </div>`;
 }
@@ -586,6 +616,11 @@ function renderReport(){
   return `
     ${renderTopbar(true)}
     <div class="app">
+      ${state.viewingPastResult ? `
+        <div class="card pad" style="margin-bottom:16px;border-color:var(--navy-2);background:#EEF3F8;">
+          <b>Viewing a previous submission</b> — this was your result from ${fmtDate(r.timestamp)}.
+          Go to <span style="text-decoration:underline;cursor:pointer;" onclick="goHome()">Exit</span> and enter your name again if you'd like to retake it.
+        </div>` : ''}
       <div class="card score-hero">
         ${renderGauge(r.pct)}
         <div class="score-side">
@@ -722,7 +757,7 @@ function renderAdmin(){
 
       <div class="card" style="overflow:hidden;">
         <table class="admin-table">
-          <thead><tr><th>Name</th><th>Submitted</th><th>Score</th><th>%</th><th>Result</th></tr></thead>
+          <thead><tr><th>Email</th><th>Submitted</th><th>Score</th><th>%</th><th>Result</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -734,6 +769,7 @@ function render(){
   document.getElementById("root").innerHTML =
     state.view === "config-missing" ? renderConfigMissing() :
     state.view === "landing" ? renderLanding() :
+    state.view === "prior-choice" ? renderPriorChoice() :
     state.view === "test" ? renderTest() :
     state.view === "report" ? renderReport() :
     state.view === "admin-gate" ? renderAdminGate() :
@@ -765,17 +801,57 @@ async function discardResume(){
   render();
 }
 
-function startTest(){
-  if (!state.name.trim()){
-    alert("Please enter your name to begin.");
+function isValidEmail(str){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str.trim());
+}
+
+async function startTest(){
+  const email = state.name.trim().toLowerCase();
+  if (!email){
+    alert("Please enter your work email address to begin.");
     return;
   }
+  if (!isValidEmail(email)){
+    alert("Please enter a valid email address (e.g. name@company.com).");
+    return;
+  }
+  state.name = email;
+  state.checkingName = true;
+  render();
+  const priorSub = await checkPriorSubmission(state.name);
+  state.checkingName = false;
+  if (priorSub){
+    state.priorSubmission = priorSub;
+    state.view = "prior-choice";
+    render();
+    return;
+  }
+  beginFreshTest();
+}
+
+function beginFreshTest(){
   state.answers = {};
   state.currentIndex = 0;
+  state.viewingPastResult = false;
   state.view = "test";
   render();
   window.scrollTo(0,0);
   saveProgress();
+}
+
+function viewPriorResult(){
+  state.name = state.priorSubmission.name;
+  state.result = state.priorSubmission.result;
+  state.viewingPastResult = true;
+  state.view = "report";
+  state.reviewFilter = "all";
+  render();
+  window.scrollTo(0,0);
+}
+
+function retakeFromPrior(){
+  state.priorSubmission = null;
+  beginFreshTest();
 }
 
 function selectOption(qid, idx){
@@ -845,6 +921,8 @@ function goHome(){
   state.answers = {};
   state.result = null;
   state.currentIndex = 0;
+  state.priorSubmission = null;
+  state.viewingPastResult = false;
   render();
   checkResume();
 }
