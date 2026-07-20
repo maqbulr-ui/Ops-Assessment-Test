@@ -296,7 +296,7 @@
 <script>
 
 // ---------- Config ----------
-const BACKEND_URL = "";
+const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzeVf_4QSXQZYR8oBw5uZphTDG6BaF3Pky0OQgbj8240rHbX3TK2WiPWxg98_xmaMhP/exec";
 const PASS_PCT = 80;
 const ADMIN_CODE = "meritto2026";
 const LETTERS = ["A","B","C","D"];
@@ -347,7 +347,7 @@ function getClientId(){
 const CLIENT_ID = getClientId();
 
 function backendConfigured(){
-  return BACKEND_URL && BACKEND_URL.indexOf('https://script.google.com/macros/s/AKfycbzeVf_4QSXQZYR8oBw5uZphTDG6BaF3Pky0OQgbj8240rHbX3TK2WiPWxg98_xmaMhP/exec') === -1;
+  return BACKEND_URL && BACKEND_URL.indexOf('PASTE_YOUR') === -1;
 }
 
 // ---------- Backend API ----------
