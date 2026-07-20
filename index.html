@@ -233,6 +233,33 @@
   .nav-bar .note{font-size:12.5px;color:var(--ink-mute);flex:1;text-align:center;min-width:180px;}
   .nav-bar .btn-ghost{width:auto;}
 
+  /* ---- test selection screen ---- */
+  .test-card{padding:24px 26px;margin-bottom:14px;}
+  .test-card .ttop{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .test-card h3{margin:0 0 6px;font-size:17px;}
+  .test-card p{margin:0;font-size:13.5px;color:var(--ink-mute);line-height:1.55;max-width:520px;}
+  .status-pill{
+    font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+    padding:4px 11px;border-radius:20px;white-space:nowrap;flex-shrink:0;
+  }
+  .status-pill.not-started{background:#EEF0F3;color:var(--ink-mute);}
+  .status-pill.in-progress{background:var(--amber-soft);color:var(--amber);}
+  .status-pill.completed{background:var(--green-soft);color:var(--green);}
+  .test-card .tactions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  .test-card .tactions .btn{width:auto;margin:0;padding:9px 16px;font-size:13.5px;}
+  .user-chip{
+    display:flex;align-items:center;gap:8px;font-size:12.5px;color:#B9C4D6;
+  }
+  .user-chip .logout{cursor:pointer;text-decoration:underline;text-underline-offset:2px;color:#CBD6E8;}
+  .user-chip .logout:hover{color:#fff;}
+
+  .test-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+  .test-tab{
+    font-size:13px;font-weight:600;padding:8px 16px;border-radius:9px;cursor:pointer;
+    background:var(--card);border:1.5px solid var(--line);color:var(--ink-mute);
+  }
+  .test-tab.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+
   @media (max-width:640px){
     .score-hero{flex-direction:column;text-align:center;}
     .qmodule,.options{margin-left:0;}
@@ -243,46 +270,50 @@
     .nav-bar{flex-direction:column;}
     .nav-bar .note{order:3;}
     .nav-dot{width:26px;height:26px;font-size:11px;}
+    .test-card .ttop{flex-direction:column;}
   }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script>
-const QUESTIONS = [{"id": 1, "section": "Fee & Payment Configuration", "module": "Fee Configuration \u2014 Discount/Coupon", "question": "A client reports their coupon code is showing as \"invalid\" and the expected 20% discount isn't applying. On checking, you see a 5% concession is already reflected on the applicant's fee. What is most likely happening?", "options": ["The coupon module has a bug that fails to validate certain coupon formats", "A different coupon (from a bulk upload) was already applied, and it's calculated on the base fee at the time it was applied \u2014 if the fee was later revised upward, the concession amount won't auto-update", "The client entered the coupon code incorrectly", "Coupons can only be applied once per institute, so the second one was blocked"], "correct": 1}, {"id": 2, "section": "Fee & Payment Configuration", "module": "Fee or Payment \u2014 Form Payment", "question": "An applicant's Application Fee and Provisional Admission Fee show as approved with a \u20b90 amount instead of the expected fee value. What should you check first?", "options": ["Whether the payment gateway failed silently and recorded a false success", "Whether the applicant originally selected a course/program for which the fee was configured as zero, and later switched to a different course \u2014 the zero-fee record can carry over", "Whether the applicant is exempt from all fees by default", "Whether the fee field was left blank by the counsellor"], "correct": 1}, {"id": 3, "section": "Fee & Payment Configuration", "module": "Fee Configuration \u2014 Application Fee Configuration", "question": "A payment gateway (e.g., Billdesk) confirms a payment was successful, but Meritto still shows the payment as pending. What is a likely cause worth checking before escalating as a payment-integration defect?", "options": ["The payment gateway integration has a sync delay of several days", "The applicant's fee fields were edited/modified after the payment was already captured, creating a mismatch between the amount paid and the current fee configuration", "The client's bank rejected the transaction after initial approval", "Payments above a certain amount always require manual approval"], "correct": 1}, {"id": 4, "section": "Fee & Payment Configuration", "module": "Configurations or Permissions \u2014 Leads", "question": "A payment that was already marked offline/approved for an applicant later reverts to \"Payment Pending\" with no clear reason. What should you check in the applicant timeline before assuming this is a system defect?", "options": ["Whether the payment gateway retried and failed a second charge", "Whether the same user who approved the payment later reverted that approval \u2014 timeline/audit logs will show both actions", "Whether the applicant's session expired mid-payment", "Whether a bulk automation reset all payment statuses"], "correct": 1}, {"id": 5, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client has the Unique Mobile Number toggle enabled, but finds 2 lead records with the same mobile number. They assume the uniqueness validation is broken. What should you check first?", "options": ["Whether the two leads were created using the same mobile number but different email addresses (uniqueness is checked on the mobile+email combination, not mobile alone) \u2014 or whether a counsellor edited a lead's mobile number after creation", "Whether the Unique Mobile Number toggle was recently switched on (it doesn't apply retroactively) \u2014 not relevant here, so not the first thing to check", "Report it directly as a product bug since the toggle should block all duplicates", "Ask the client to delete one of the two leads manually without investigating"], "correct": 0}, {"id": 6, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Team and User", "question": "A client wants leads created by consultants/agents to always show \"Consultant\" in the source field. Some leads instead show a blank \"Created By\"/Agent Code field even though the source is Consultant. What is a likely explanation?", "options": ["The lead form was configured incorrectly", "The consultant/agent's user account is inactive \u2014 when the linked account is inactive, the Agent Code/Created By field does not get populated for leads routed through them", "Agent Code only populates for leads created via the mobile app", "This field is populated randomly and cannot be relied upon"], "correct": 1}, {"id": 7, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client reports that a lead's stage was modified by a user who is NOT the assigned owner of that lead, and asks how this was possible given access controls. What is a likely, non-bug explanation?", "options": ["Any user with login access can edit any lead regardless of ownership", "When an assigned counsellor is unavailable during an inbound call, another available counsellor may handle the call and update the lead \u2014 this cross-assignment during live-call handling is expected behavior", "The ownership field was corrupted during a data migration", "Non-owners can only view leads, never edit them, so this must be investigated as a critical bug"], "correct": 1}, {"id": 8, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Permission", "question": "A client asks how a specific lead was created via offline upload even though the user who created it did not have \"Bulk Upload\" permission enabled. What's the likely explanation?", "options": ["The permission system has a gap that must be reported as a bug", "The lead was not created through Bulk Upload at all \u2014 it was created via the separate \"Add Quick Lead\" option, which is governed by an independent permission from Bulk Upload", "Permissions only apply to web, not to mobile app uploads", "The user borrowed another colleague's login session"], "correct": 1}, {"id": 9, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Purge", "question": "A client cannot locate a specific paid application in the portal using either the application number or registered email, despite the applicant having completed payment. What is a possible root cause beyond \"the record is missing/deleted\"?", "options": ["The specific program/course the applicant applied under may lack a proper allocation automation, leaving applications for that program unassigned and effectively hidden from normal views", "Applications are automatically purged after 24 hours if unpaid", "Search only works for applications submitted in the last 7 days", "The application number format was entered with a typo and nothing else needs checking"], "correct": 0}, {"id": 10, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client is unable to download the full leads dump from Lead Manager despite other functionality working fine. What is the most likely non-bug explanation?", "options": ["The account has exceeded its total lead storage limit", "All records must be explicitly selected on the listing page before initiating a download \u2014 attempting to download without full selection causes it to fail", "Downloads only work between 9 AM and 6 PM", "The leads dump feature requires a separate paid add-on"], "correct": 1}, {"id": 11, "section": "Leads, Applications & Duplicate Handling", "module": "Form and Automation \u2014 Application Form", "question": "A client asks who deleted a specific lead and when, for internal audit purposes. What should the Ops team do before escalating this as unresolvable?", "options": ["Tell the client deleted records cannot be traced under any circumstances", "Check the purge/audit history \u2014 it retains the deleting user and timestamp (along with limited identifiers like email/mobile), so this can usually be answered directly without Product involvement", "Ask the client to re-create the lead manually and move on", "Escalate immediately to Product/RnD since audit trails aren't accessible to Ops"], "correct": 1}, {"id": 12, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions \u2014 Leads", "question": "A client wants lead data to remain masked even when exported/downloaded by users who can view unmasked data on-screen. What is the current expected system behavior to communicate?", "options": ["Downloads are always masked regardless of screen-view permission, so this must be a bug", "Masking on export is tied to the same permission as on-screen masking \u2014 a user permitted to view unmasked data will also be able to download it unmasked; there's no independent \"mask on export only\" control", "Masking can be toggled separately per report but not per user", "Only Admin users can ever download unmasked data, regardless of permissions"], "correct": 1}, {"id": 13, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client reports an opportunity-to-lead automation didn't fire when a specific field was updated for the first time on a new opportunity. What is a key automation-trigger concept to check before treating this as a defect?", "options": ["Opportunity-based automations never work on first-time field population \u2014 for many field-update triggers, the very first time a field is populated is not treated as an \"update\" event, so the automation won't fire on a fresh record", "Automations only run once per day in a scheduled batch", "Opportunity automations require manual activation every time a new record is created", "The automation must have been accidentally disabled"], "correct": 0}, {"id": 14, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "An automation meant to trigger on a date-type field update (e.g., a test schedule slot) isn't firing even though the field clearly has a value. What subtlety commonly explains this?", "options": ["If the field's value was auto-populated by the system (rather than manually entered/selected by a user), it may not register as a qualifying \"update\" event for the automation trigger", "Date fields cannot be used as automation triggers under any configuration", "The automation engine has a known limitation with all date-type fields", "The trigger only works if the date is in the past, not the future"], "correct": 0}, {"id": 15, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A lead already assigned to a specific owner unexpectedly retains that same owner even after an allocation automation runs and should have reassigned it. What configuration detail explains this?", "options": ["The automation is configured using \"Add Logic\" allocation, which retains an existing owner (if outside the configured teams) alongside the new logic \u2014 switching to \"Override\" allocation would replace the existing owner instead", "Allocation automations can never reassign a lead that already has an owner, under any configuration", "The lead must be manually unassigned before any automation can act on it", "This only happens when the lead source is set to \"Offline\""], "correct": 0}, {"id": 16, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Drip Marketing", "question": "A client sees an automation-triggered email sent months after the underlying application stage was actually updated, and worries this signals a systemic delay bug. What scenario often explains a long-delayed trigger like this?", "options": ["The automation runs on a fixed monthly schedule regardless of trigger conditions", "If application stages are shared across multiple forms and the same lead has multiple applications, one form's stage update at a later date can cause all of the automation's conditions to become simultaneously true \u2014 triggering it late, once, for that shared condition set", "Emails are always queued for a minimum of 60 days before sending", "The lead's email address must have bounced repeatedly before finally going through"], "correct": 1}, {"id": 17, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "An automation is expected to auto-assign leads to owners, but leads from a specific channel remain unassigned. What is one commonly overlooked scoping detail to check?", "options": ["Whether the automation's trigger stage (e.g., only applies when Lead Stage = \"Untouched\") and any configured field-value conditions (e.g., specific program/course values) actually match the leads in question \u2014 leads outside that scope won't be picked up", "Whether the lead source field is capitalized correctly", "Whether the automation has run out of available executions for the month", "Whether the client's subscription tier supports automation"], "correct": 0}, {"id": 18, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client asks why opportunities for two specific institutes aren't getting auto-assigned per an existing automation, while other institutes work fine. What is a likely root cause to check?", "options": ["The automation itself must be broken for those two institutes specifically", "A required permission may be missing on the relevant role/permission set (e.g., Counsellor) for those specific accounts \u2014 enabling the permission is often all that's needed", "Opportunities can only be auto-assigned for a single institute at a time, by design", "The automation needs to be manually re-triggered for each opportunity individually"], "correct": 1}, {"id": 19, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client reports that the target audience count drops sharply once an automation reaches its WhatsApp communication node, even though the same audience qualified at an earlier email node. What two factors commonly explain this?", "options": ["Lead-level conditions are typically re-evaluated dynamically at each node (so a lead's status can change between nodes and drop it from later steps), and WhatsApp delivery does not support international phone numbers", "WhatsApp nodes have a hard cap of 100 recipients per automation run", "The audience list gets randomly shuffled at each node", "Email and WhatsApp nodes cannot share the same audience under any configuration"], "correct": 0}, {"id": 20, "section": "Automation Trigger Logic", "module": "Form and Automation \u2014 Allocation/Sales Automation", "question": "A client questions why an email automation didn't send for several applicants even though the trigger stage clearly changed for all of them. What should Ops check before assuming a systemic failure?", "options": ["Whether the automation also has additional field conditions beyond the stage trigger \u2014 in most such cases, the stage changed but underlying conditions weren't met, so no email was expected for those records", "Whether the client's account has been suspended", "Whether the applicants opted out of all communication globally", "Whether the automation only works for even-numbered application IDs"], "correct": 0}, {"id": 21, "section": "Integrations: Webhook / ERP", "module": "Integration \u2014 Webhook - ERP", "question": "A client reports the \"Bulk Push to Webhook\" feature isn't working for lead data at all. Before escalating as a defect, what configuration point should be verified?", "options": ["Whether the webhook is actually activated/enabled for the account, and whether push mode (manual vs automatic) matches what the client expects \u2014 pushes may need to be manually enabled and triggered", "Whether the client's ERP vendor has blacklisted the account", "Whether the internet connection at the client's office is stable", "Whether Bulk Push only supports CSV exports, not webhooks"], "correct": 0}, {"id": 22, "section": "Integrations: Webhook / ERP", "module": "Integration \u2014 Webhook - ERP", "question": "A client reports application fee amounts (instead of the agreed token fee) were pushed to their ERP, and some records were pushed more than once, during a specific date window. What operational cause is worth investigating first?", "options": ["The ERP system itself corrupted the incoming data", "The webhook's trigger point may have been temporarily and manually reconfigured (e.g., to push a few records that weren't going through normally) and not been fully/cleanly reverted afterward \u2014 causing re-pushes with the wrong data for that window", "Token fee and application fee are always pushed together by design", "The client's ERP field mapping was never set up"], "correct": 1}, {"id": 23, "section": "Publisher & Third-Party Source Integration", "module": "App and Extensions \u2014 Publisher Integration", "question": "A client is unable to create a Publisher panel user for a specific email ID, getting an error that the email already exists with a different user type/privilege. What's the likely explanation?", "options": ["The publisher panel has a random validation bug", "The email ID already exists in the system under a different entity/role (e.g., a standard user or a publisher user on a different account) \u2014 the system is correctly blocking a duplicate per its uniqueness rules", "Publisher accounts can only be created on weekdays", "The email provider is blocking account creation"], "correct": 1}, {"id": 24, "section": "Publisher & Third-Party Source Integration", "module": "App and Extensions \u2014 Publisher Integration", "question": "A client (via a publisher/agency) reports leads pushed via API aren't showing up on the dashboard/panel, or counts don't match what was sent. What is a common non-bug explanation?", "options": ["The leads were dropped somewhere in transit by the network", "The lead's source/campaign wasn't yet mapped/configured for that account, and/or the missing leads were filtered out as duplicates \u2014 both are visibility/configuration issues rather than data loss", "Publisher-sourced leads are capped at a fixed daily quota, by design", "The dashboard only refreshes once every 48 hours"], "correct": 1}, {"id": 25, "section": "WhatsApp / Communication Channels", "module": "App and Extensions \u2014 WABA", "question": "A client says they were told the WhatsApp Business template media upload limit is 15MB, but their videos (well under 15MB) are failing to upload. What's the correct explanation?", "options": ["WhatsApp Business Template limits are: Images 5MB, Videos 5MB, Documents 15MB \u2014 the 15MB figure applies to documents only, not videos", "Video uploads are not supported on WhatsApp Business templates at all", "The client's video file is corrupted", "15MB is correct for videos too; there is a temporary outage on Meta's end"], "correct": 0}, {"id": 26, "section": "WhatsApp / Communication Channels", "module": "Configurations or Permissions \u2014 Leads", "question": "A client cannot filter/search a WhatsApp communication using a specific Job ID that was generated via an automation. What should you clarify about the filter's scope?", "options": ["The Job ID filter in Lead Manager only supports bulk communication Job IDs, not automation-triggered communication Job IDs \u2014 this is a scope limitation, not a defect", "Job IDs expire after 24 hours and cannot be searched afterward", "Only Admin users can filter by Job ID", "WhatsApp Job IDs are not searchable under any circumstance"], "correct": 0}, {"id": 27, "section": "WhatsApp / Communication Channels", "module": "Form and Automation \u2014 Communication Template - Email/SMS/Waba", "question": "A client reports a specific email/SMS/WhatsApp communication did not go out at the exact time an automation should have triggered it, and no other errors are visible. What resource-related cause is worth checking first?", "options": ["Whether the communication credit balance (SMS/email credits) had been exhausted at the exact time the automation was set to trigger \u2014 insufficient balance blocks the send even if everything else is configured correctly", "Whether the recipient's number is registered on a Do Not Disturb list", "Whether the template contains any emoji, which can silently block sending", "Whether the automation ran on a public holiday"], "correct": 0}, {"id": 28, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Report and Dashboard", "question": "A client reports that leads shown against team members in a Productivity Report don't match the actual leads assigned to them in Lead Manager. What is a common, simple explanation to check before assuming a data sync bug?", "options": ["The report and Lead Manager may be using different default filters (e.g., the report defaulting to \"last 30 days\" while Lead Manager was viewed without that date range) \u2014 aligning the filters usually resolves the mismatch", "Productivity Reports only update once per week", "Lead Manager and Reports pull from two entirely separate databases that are never in sync", "Only Admin accounts see accurate productivity numbers"], "correct": 0}, {"id": 29, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Campaign and Tracking", "question": "A client sees different \"Paid Application\" counts across three different reports for the same period (e.g., Admin Dashboard vs. Campaign Manager vs. Lead Disposition Summary) and assumes a sync issue. What should you check?", "options": ["Whether each report has different inclusion criteria by design \u2014 for example, one report may exclude unmapped applications while others include them, explaining the count difference without any sync defect", "Whether the client is looking at data from two different financial years", "Whether one of the three reports has a caching bug that must be reported immediately", "Whether the client has permission to view all three reports simultaneously"], "correct": 0}, {"id": 30, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Report and Dashboard", "question": "A client reports a large discrepancy between inbound call counts shown in Lead Manager filters versus the raw telephony panel (e.g., Mcube) for the same period. What historical/setup factor is worth checking?", "options": ["Whether the agent phone numbers used for those calls were mapped in the telephony configuration at the time the calls were made \u2014 calls made before a mapping was set up won't reflect correctly in Lead Manager, even though the mapping now works going forward", "Whether the client is comparing calls across two different time zones", "Whether Lead Manager has a hard cap on the number of calls it can display", "Whether the telephony vendor is billing incorrectly"], "correct": 0}, {"id": 31, "section": "Reports & Dashboards", "module": "Configurations or Permissions \u2014 Report and Dashboard", "question": "A client reports a dashboard widget for website page analytics isn't showing any data. Before escalating as a product defect, what is worth confirming with the client?", "options": ["Whether the tracking script/enquiry form is actually correctly placed and mapped on the specific landing page URLs being analyzed \u2014 the widget depends on that setup existing on each page", "Whether the client's website uses HTTPS", "Whether the widget only supports Google Analytics-linked accounts", "Whether the browser being used to view the dashboard is outdated"], "correct": 0}, {"id": 32, "section": "Reports & Dashboards", "module": "App and Extensions \u2014 Social Channel Connector", "question": "A client (via a publisher) can't find leads captured with campaign attribution changing across two visits (e.g., \"Secondary Campaign\" not updating despite a change in Medium or Campaign Name). What's the precise trigger condition to explain?", "options": ["The Secondary Campaign field is only captured/triggered when there is a change specifically in Campaign Source between two registrations \u2014 changes to Medium or Campaign Name alone won't trigger it", "Secondary Campaign only updates for leads from paid social platforms, never organic", "Secondary Campaign is a manual-entry-only field and can never populate automatically", "This field only updates once every 90 days regardless of activity"], "correct": 0}, {"id": 33, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Team and User", "question": "A client can't access a feature (e.g., Click-to-Call) on a user's panel even though it's enabled at the account/admin level. What additional layer should be checked?", "options": ["Enabling a feature at the account/admin level is sometimes not enough \u2014 certain features also require a device/app-level setting to be turned on for that specific user before it becomes visible/usable", "The feature must be re-purchased separately for each user", "The feature only activates after 30 days of account tenure", "Click-to-Call only works for users created in the last week"], "correct": 0}, {"id": 34, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Mobile App", "question": "A client suggests that counsellors should not be able to add notes on leads they don't own, and flags the current behavior (which allows it) as a bug. How should this be classified?", "options": ["This should be logged directly as a critical security bug and escalated urgently", "This is existing, intended system behavior \u2014 not every disagreement with current behavior is a defect; this should be treated as a feature enhancement request and routed to Product for prioritization, not as a bug", "This can be fixed instantly by disabling the Notes feature entirely", "This only happens on the mobile app and is irrelevant to web users"], "correct": 1}, {"id": 35, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Echo", "question": "A client can't see conversation responses on an integrated chat tool (e.g., Echo) for certain users, sometimes getting a 404 error. What configuration nuance might explain this?", "options": ["When WhatsApp Business (WABA) is configured on a specific extension, priority is given to that extension configuration for showing responses \u2014 this is expected behavior tied to how the extension is set up, not a defect", "Echo requires a separate license per user to view any response", "404 errors always indicate the account has been deleted", "Echo responses are only visible to the original creator of the conversation"], "correct": 0}, {"id": 36, "section": "Access, Permissions & Feature Scope", "module": "Form and Automation \u2014 Application Form", "question": "A client reports an application/form's completion status appears inconsistent \u2014 some records show \"Completed\" after finishing only part of a multi-part form, while records that finished the true final part show \"In Progress.\" What configuration detail explains this?", "options": ["The form-completion trigger may be configured against an earlier part (e.g., Part 1) instead of the actual final part of the client's process (e.g., Part 2) \u2014 aligning the trigger with the correct final step resolves the mismatch", "Form completion status is randomly assigned and cannot be relied upon", "Completion status only updates once every 24 hours", "Multi-part forms are not supported and always show incorrect status"], "correct": 0}, {"id": 37, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Mobile App", "question": "A client sees a stage/option (e.g., a specific application stage) rendering differently between the mobile app and web for the same lead. What's a likely explanation before assuming a mobile app defect?", "options": ["On web, if only one application form is available it may get auto-selected and shown by default, whereas mobile may require the user to explicitly select the form first \u2014 leading to an apparent difference until the correct form is chosen", "The mobile app only supports half the features of the web platform, by design", "Application stages sync between mobile and web only once per day", "This always indicates the mobile app version is outdated"], "correct": 0}, {"id": 38, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions \u2014 Permission", "question": "A client reports a user is suddenly seeing admin-like options (e.g., reassign, broader visibility) that they shouldn't have, despite nothing being intentionally changed. What should be checked first?", "options": ["Immediately assume a security breach and lock the entire account", "Review the user's current role/permission configuration \u2014 an unintended permission change (even one made internally) can grant broader access than intended, and correcting the role setting resolves it", "This is expected behavior for all users after 90 days", "Admin-like options appear randomly and are purely cosmetic"], "correct": 1}, {"id": 39, "section": "Domain, DNS & Environment Configuration", "module": "Configurations or Permissions \u2014 Team and User (Domain/DNS Configuration)", "question": "A client reports being unable to activate their account, or that a registration/verification link doesn't redirect correctly \u2014 and this started right after they changed their company's domain or subdomain. What is the most likely root cause?", "options": ["The account itself has been deactivated at the backend \u2014 request Product to reactivate it", "The required DNS records (e.g., CNAME) were not updated/propagated on the client's domain side after the change \u2014 sharing/re-configuring the correct DNS records resolves it", "There's a temporary server outage affecting all activation emails", "The user's email inbox is full and can't receive new emails"], "correct": 1}, {"id": 40, "section": "Domain, DNS & Environment Configuration", "module": "App and Extensions \u2014 Telephony", "question": "A client's telephony call logs show call duration but the calls aren't reflecting in the lead/candidate timeline. What setup-related possibility should be checked?", "options": ["Whether the account's telephony setup is still on an older/legacy configuration in the system rather than the current one \u2014 migrating to the current configuration is often the fix", "Whether the telephony vendor has gone out of business", "Whether call logs are only visible on weekdays", "Whether the candidate's number was entered with a country code"], "correct": 0}];
+const TESTS = {"product-understanding": {"name": "Product Understanding", "description": "40 real cases that were parked to the Product team as suspected bugs but turned out to be configuration, permission, or process understanding gaps. Read each scenario and pick the best explanation.", "questions": [{"id": 1, "section": "Fee & Payment Configuration", "module": "Fee Configuration — Discount/Coupon", "question": "A client reports their coupon code is showing as \"invalid\" and the expected 20% discount isn't applying. On checking, you see a 5% concession is already reflected on the applicant's fee. What is most likely happening?", "options": ["The coupon module has a bug that fails to validate certain coupon formats", "A different coupon (from a bulk upload) was already applied, and it's calculated on the base fee at the time it was applied — if the fee was later revised upward, the concession amount won't auto-update", "The client entered the coupon code incorrectly", "Coupons can only be applied once per institute, so the second one was blocked"], "correct": 1}, {"id": 2, "section": "Fee & Payment Configuration", "module": "Fee or Payment — Form Payment", "question": "An applicant's Application Fee and Provisional Admission Fee show as approved with a ₹0 amount instead of the expected fee value. What should you check first?", "options": ["Whether the payment gateway failed silently and recorded a false success", "Whether the applicant originally selected a course/program for which the fee was configured as zero, and later switched to a different course — the zero-fee record can carry over", "Whether the applicant is exempt from all fees by default", "Whether the fee field was left blank by the counsellor"], "correct": 1}, {"id": 3, "section": "Fee & Payment Configuration", "module": "Fee Configuration — Application Fee Configuration", "question": "A payment gateway (e.g., Billdesk) confirms a payment was successful, but Meritto still shows the payment as pending. What is a likely cause worth checking before escalating as a payment-integration defect?", "options": ["The payment gateway integration has a sync delay of several days", "The applicant's fee fields were edited/modified after the payment was already captured, creating a mismatch between the amount paid and the current fee configuration", "The client's bank rejected the transaction after initial approval", "Payments above a certain amount always require manual approval"], "correct": 1}, {"id": 4, "section": "Fee & Payment Configuration", "module": "Configurations or Permissions — Leads", "question": "A payment that was already marked offline/approved for an applicant later reverts to \"Payment Pending\" with no clear reason. What should you check in the applicant timeline before assuming this is a system defect?", "options": ["Whether the payment gateway retried and failed a second charge", "Whether the same user who approved the payment later reverted that approval — timeline/audit logs will show both actions", "Whether the applicant's session expired mid-payment", "Whether a bulk automation reset all payment statuses"], "correct": 1}, {"id": 5, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions — Leads", "question": "A client has the Unique Mobile Number toggle enabled, but finds 2 lead records with the same mobile number. They assume the uniqueness validation is broken. What should you check first?", "options": ["Whether the two leads were created using the same mobile number but different email addresses (uniqueness is checked on the mobile+email combination, not mobile alone) — or whether a counsellor edited a lead's mobile number after creation", "Whether the Unique Mobile Number toggle was recently switched on (it doesn't apply retroactively) — not relevant here, so not the first thing to check", "Report it directly as a product bug since the toggle should block all duplicates", "Ask the client to delete one of the two leads manually without investigating"], "correct": 0}, {"id": 6, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions — Team and User", "question": "A client wants leads created by consultants/agents to always show \"Consultant\" in the source field. Some leads instead show a blank \"Created By\"/Agent Code field even though the source is Consultant. What is a likely explanation?", "options": ["The lead form was configured incorrectly", "The consultant/agent's user account is inactive — when the linked account is inactive, the Agent Code/Created By field does not get populated for leads routed through them", "Agent Code only populates for leads created via the mobile app", "This field is populated randomly and cannot be relied upon"], "correct": 1}, {"id": 7, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions — Leads", "question": "A client reports that a lead's stage was modified by a user who is NOT the assigned owner of that lead, and asks how this was possible given access controls. What is a likely, non-bug explanation?", "options": ["Any user with login access can edit any lead regardless of ownership", "When an assigned counsellor is unavailable during an inbound call, another available counsellor may handle the call and update the lead — this cross-assignment during live-call handling is expected behavior", "The ownership field was corrupted during a data migration", "Non-owners can only view leads, never edit them, so this must be investigated as a critical bug"], "correct": 1}, {"id": 8, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions — Permission", "question": "A client asks how a specific lead was created via offline upload even though the user who created it did not have \"Bulk Upload\" permission enabled. What's the likely explanation?", "options": ["The permission system has a gap that must be reported as a bug", "The lead was not created through Bulk Upload at all — it was created via the separate \"Add Quick Lead\" option, which is governed by an independent permission from Bulk Upload", "Permissions only apply to web, not to mobile app uploads", "The user borrowed another colleague's login session"], "correct": 1}, {"id": 9, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions — Purge", "question": "A client cannot locate a specific paid application in the portal using either the application number or registered email, despite the applicant having completed payment. What is a possible root cause beyond \"the record is missing/deleted\"?", "options": ["The specific program/course the applicant applied under may lack a proper allocation automation, leaving applications for that program unassigned and effectively hidden from normal views", "Applications are automatically purged after 24 hours if unpaid", "Search only works for applications submitted in the last 7 days", "The application number format was entered with a typo and nothing else needs checking"], "correct": 0}, {"id": 10, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions — Leads", "question": "A client is unable to download the full leads dump from Lead Manager despite other functionality working fine. What is the most likely non-bug explanation?", "options": ["The account has exceeded its total lead storage limit", "All records must be explicitly selected on the listing page before initiating a download — attempting to download without full selection causes it to fail", "Downloads only work between 9 AM and 6 PM", "The leads dump feature requires a separate paid add-on"], "correct": 1}, {"id": 11, "section": "Leads, Applications & Duplicate Handling", "module": "Form and Automation — Application Form", "question": "A client asks who deleted a specific lead and when, for internal audit purposes. What should the Ops team do before escalating this as unresolvable?", "options": ["Tell the client deleted records cannot be traced under any circumstances", "Check the purge/audit history — it retains the deleting user and timestamp (along with limited identifiers like email/mobile), so this can usually be answered directly without Product involvement", "Ask the client to re-create the lead manually and move on", "Escalate immediately to Product/RnD since audit trails aren't accessible to Ops"], "correct": 1}, {"id": 12, "section": "Leads, Applications & Duplicate Handling", "module": "Configurations or Permissions — Leads", "question": "A client wants lead data to remain masked even when exported/downloaded by users who can view unmasked data on-screen. What is the current expected system behavior to communicate?", "options": ["Downloads are always masked regardless of screen-view permission, so this must be a bug", "Masking on export is tied to the same permission as on-screen masking — a user permitted to view unmasked data will also be able to download it unmasked; there's no independent \"mask on export only\" control", "Masking can be toggled separately per report but not per user", "Only Admin users can ever download unmasked data, regardless of permissions"], "correct": 1}, {"id": 13, "section": "Automation Trigger Logic", "module": "Form and Automation — Allocation/Sales Automation", "question": "A client reports an opportunity-to-lead automation didn't fire when a specific field was updated for the first time on a new opportunity. What is a key automation-trigger concept to check before treating this as a defect?", "options": ["Opportunity-based automations never work on first-time field population — for many field-update triggers, the very first time a field is populated is not treated as an \"update\" event, so the automation won't fire on a fresh record", "Automations only run once per day in a scheduled batch", "Opportunity automations require manual activation every time a new record is created", "The automation must have been accidentally disabled"], "correct": 0}, {"id": 14, "section": "Automation Trigger Logic", "module": "Form and Automation — Allocation/Sales Automation", "question": "An automation meant to trigger on a date-type field update (e.g., a test schedule slot) isn't firing even though the field clearly has a value. What subtlety commonly explains this?", "options": ["If the field's value was auto-populated by the system (rather than manually entered/selected by a user), it may not register as a qualifying \"update\" event for the automation trigger", "Date fields cannot be used as automation triggers under any configuration", "The automation engine has a known limitation with all date-type fields", "The trigger only works if the date is in the past, not the future"], "correct": 0}, {"id": 15, "section": "Automation Trigger Logic", "module": "Form and Automation — Allocation/Sales Automation", "question": "A lead already assigned to a specific owner unexpectedly retains that same owner even after an allocation automation runs and should have reassigned it. What configuration detail explains this?", "options": ["The automation is configured using \"Add Logic\" allocation, which retains an existing owner (if outside the configured teams) alongside the new logic — switching to \"Override\" allocation would replace the existing owner instead", "Allocation automations can never reassign a lead that already has an owner, under any configuration", "The lead must be manually unassigned before any automation can act on it", "This only happens when the lead source is set to \"Offline\""], "correct": 0}, {"id": 16, "section": "Automation Trigger Logic", "module": "Form and Automation — Drip Marketing", "question": "A client sees an automation-triggered email sent months after the underlying application stage was actually updated, and worries this signals a systemic delay bug. What scenario often explains a long-delayed trigger like this?", "options": ["The automation runs on a fixed monthly schedule regardless of trigger conditions", "If application stages are shared across multiple forms and the same lead has multiple applications, one form's stage update at a later date can cause all of the automation's conditions to become simultaneously true — triggering it late, once, for that shared condition set", "Emails are always queued for a minimum of 60 days before sending", "The lead's email address must have bounced repeatedly before finally going through"], "correct": 1}, {"id": 17, "section": "Automation Trigger Logic", "module": "Form and Automation — Allocation/Sales Automation", "question": "An automation is expected to auto-assign leads to owners, but leads from a specific channel remain unassigned. What is one commonly overlooked scoping detail to check?", "options": ["Whether the automation's trigger stage (e.g., only applies when Lead Stage = \"Untouched\") and any configured field-value conditions (e.g., specific program/course values) actually match the leads in question — leads outside that scope won't be picked up", "Whether the lead source field is capitalized correctly", "Whether the automation has run out of available executions for the month", "Whether the client's subscription tier supports automation"], "correct": 0}, {"id": 18, "section": "Automation Trigger Logic", "module": "Form and Automation — Allocation/Sales Automation", "question": "A client asks why opportunities for two specific institutes aren't getting auto-assigned per an existing automation, while other institutes work fine. What is a likely root cause to check?", "options": ["The automation itself must be broken for those two institutes specifically", "A required permission may be missing on the relevant role/permission set (e.g., Counsellor) for those specific accounts — enabling the permission is often all that's needed", "Opportunities can only be auto-assigned for a single institute at a time, by design", "The automation needs to be manually re-triggered for each opportunity individually"], "correct": 1}, {"id": 19, "section": "Automation Trigger Logic", "module": "Form and Automation — Allocation/Sales Automation", "question": "A client reports that the target audience count drops sharply once an automation reaches its WhatsApp communication node, even though the same audience qualified at an earlier email node. What two factors commonly explain this?", "options": ["Lead-level conditions are typically re-evaluated dynamically at each node (so a lead's status can change between nodes and drop it from later steps), and WhatsApp delivery does not support international phone numbers", "WhatsApp nodes have a hard cap of 100 recipients per automation run", "The audience list gets randomly shuffled at each node", "Email and WhatsApp nodes cannot share the same audience under any configuration"], "correct": 0}, {"id": 20, "section": "Automation Trigger Logic", "module": "Form and Automation — Allocation/Sales Automation", "question": "A client questions why an email automation didn't send for several applicants even though the trigger stage clearly changed for all of them. What should Ops check before assuming a systemic failure?", "options": ["Whether the automation also has additional field conditions beyond the stage trigger — in most such cases, the stage changed but underlying conditions weren't met, so no email was expected for those records", "Whether the client's account has been suspended", "Whether the applicants opted out of all communication globally", "Whether the automation only works for even-numbered application IDs"], "correct": 0}, {"id": 21, "section": "Integrations: Webhook / ERP", "module": "Integration — Webhook - ERP", "question": "A client reports the \"Bulk Push to Webhook\" feature isn't working for lead data at all. Before escalating as a defect, what configuration point should be verified?", "options": ["Whether the webhook is actually activated/enabled for the account, and whether push mode (manual vs automatic) matches what the client expects — pushes may need to be manually enabled and triggered", "Whether the client's ERP vendor has blacklisted the account", "Whether the internet connection at the client's office is stable", "Whether Bulk Push only supports CSV exports, not webhooks"], "correct": 0}, {"id": 22, "section": "Integrations: Webhook / ERP", "module": "Integration — Webhook - ERP", "question": "A client reports application fee amounts (instead of the agreed token fee) were pushed to their ERP, and some records were pushed more than once, during a specific date window. What operational cause is worth investigating first?", "options": ["The ERP system itself corrupted the incoming data", "The webhook's trigger point may have been temporarily and manually reconfigured (e.g., to push a few records that weren't going through normally) and not been fully/cleanly reverted afterward — causing re-pushes with the wrong data for that window", "Token fee and application fee are always pushed together by design", "The client's ERP field mapping was never set up"], "correct": 1}, {"id": 23, "section": "Publisher & Third-Party Source Integration", "module": "App and Extensions — Publisher Integration", "question": "A client is unable to create a Publisher panel user for a specific email ID, getting an error that the email already exists with a different user type/privilege. What's the likely explanation?", "options": ["The publisher panel has a random validation bug", "The email ID already exists in the system under a different entity/role (e.g., a standard user or a publisher user on a different account) — the system is correctly blocking a duplicate per its uniqueness rules", "Publisher accounts can only be created on weekdays", "The email provider is blocking account creation"], "correct": 1}, {"id": 24, "section": "Publisher & Third-Party Source Integration", "module": "App and Extensions — Publisher Integration", "question": "A client (via a publisher/agency) reports leads pushed via API aren't showing up on the dashboard/panel, or counts don't match what was sent. What is a common non-bug explanation?", "options": ["The leads were dropped somewhere in transit by the network", "The lead's source/campaign wasn't yet mapped/configured for that account, and/or the missing leads were filtered out as duplicates — both are visibility/configuration issues rather than data loss", "Publisher-sourced leads are capped at a fixed daily quota, by design", "The dashboard only refreshes once every 48 hours"], "correct": 1}, {"id": 25, "section": "WhatsApp / Communication Channels", "module": "App and Extensions — WABA", "question": "A client says they were told the WhatsApp Business template media upload limit is 15MB, but their videos (well under 15MB) are failing to upload. What's the correct explanation?", "options": ["WhatsApp Business Template limits are: Images 5MB, Videos 5MB, Documents 15MB — the 15MB figure applies to documents only, not videos", "Video uploads are not supported on WhatsApp Business templates at all", "The client's video file is corrupted", "15MB is correct for videos too; there is a temporary outage on Meta's end"], "correct": 0}, {"id": 26, "section": "WhatsApp / Communication Channels", "module": "Configurations or Permissions — Leads", "question": "A client cannot filter/search a WhatsApp communication using a specific Job ID that was generated via an automation. What should you clarify about the filter's scope?", "options": ["The Job ID filter in Lead Manager only supports bulk communication Job IDs, not automation-triggered communication Job IDs — this is a scope limitation, not a defect", "Job IDs expire after 24 hours and cannot be searched afterward", "Only Admin users can filter by Job ID", "WhatsApp Job IDs are not searchable under any circumstance"], "correct": 0}, {"id": 27, "section": "WhatsApp / Communication Channels", "module": "Form and Automation — Communication Template - Email/SMS/Waba", "question": "A client reports a specific email/SMS/WhatsApp communication did not go out at the exact time an automation should have triggered it, and no other errors are visible. What resource-related cause is worth checking first?", "options": ["Whether the communication credit balance (SMS/email credits) had been exhausted at the exact time the automation was set to trigger — insufficient balance blocks the send even if everything else is configured correctly", "Whether the recipient's number is registered on a Do Not Disturb list", "Whether the template contains any emoji, which can silently block sending", "Whether the automation ran on a public holiday"], "correct": 0}, {"id": 28, "section": "Reports & Dashboards", "module": "Configurations or Permissions — Report and Dashboard", "question": "A client reports that leads shown against team members in a Productivity Report don't match the actual leads assigned to them in Lead Manager. What is a common, simple explanation to check before assuming a data sync bug?", "options": ["The report and Lead Manager may be using different default filters (e.g., the report defaulting to \"last 30 days\" while Lead Manager was viewed without that date range) — aligning the filters usually resolves the mismatch", "Productivity Reports only update once per week", "Lead Manager and Reports pull from two entirely separate databases that are never in sync", "Only Admin accounts see accurate productivity numbers"], "correct": 0}, {"id": 29, "section": "Reports & Dashboards", "module": "Configurations or Permissions — Campaign and Tracking", "question": "A client sees different \"Paid Application\" counts across three different reports for the same period (e.g., Admin Dashboard vs. Campaign Manager vs. Lead Disposition Summary) and assumes a sync issue. What should you check?", "options": ["Whether each report has different inclusion criteria by design — for example, one report may exclude unmapped applications while others include them, explaining the count difference without any sync defect", "Whether the client is looking at data from two different financial years", "Whether one of the three reports has a caching bug that must be reported immediately", "Whether the client has permission to view all three reports simultaneously"], "correct": 0}, {"id": 30, "section": "Reports & Dashboards", "module": "Configurations or Permissions — Report and Dashboard", "question": "A client reports a large discrepancy between inbound call counts shown in Lead Manager filters versus the raw telephony panel (e.g., Mcube) for the same period. What historical/setup factor is worth checking?", "options": ["Whether the agent phone numbers used for those calls were mapped in the telephony configuration at the time the calls were made — calls made before a mapping was set up won't reflect correctly in Lead Manager, even though the mapping now works going forward", "Whether the client is comparing calls across two different time zones", "Whether Lead Manager has a hard cap on the number of calls it can display", "Whether the telephony vendor is billing incorrectly"], "correct": 0}, {"id": 31, "section": "Reports & Dashboards", "module": "Configurations or Permissions — Report and Dashboard", "question": "A client reports a dashboard widget for website page analytics isn't showing any data. Before escalating as a product defect, what is worth confirming with the client?", "options": ["Whether the tracking script/enquiry form is actually correctly placed and mapped on the specific landing page URLs being analyzed — the widget depends on that setup existing on each page", "Whether the client's website uses HTTPS", "Whether the widget only supports Google Analytics-linked accounts", "Whether the browser being used to view the dashboard is outdated"], "correct": 0}, {"id": 32, "section": "Reports & Dashboards", "module": "App and Extensions — Social Channel Connector", "question": "A client (via a publisher) can't find leads captured with campaign attribution changing across two visits (e.g., \"Secondary Campaign\" not updating despite a change in Medium or Campaign Name). What's the precise trigger condition to explain?", "options": ["The Secondary Campaign field is only captured/triggered when there is a change specifically in Campaign Source between two registrations — changes to Medium or Campaign Name alone won't trigger it", "Secondary Campaign only updates for leads from paid social platforms, never organic", "Secondary Campaign is a manual-entry-only field and can never populate automatically", "This field only updates once every 90 days regardless of activity"], "correct": 0}, {"id": 33, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions — Team and User", "question": "A client can't access a feature (e.g., Click-to-Call) on a user's panel even though it's enabled at the account/admin level. What additional layer should be checked?", "options": ["Enabling a feature at the account/admin level is sometimes not enough — certain features also require a device/app-level setting to be turned on for that specific user before it becomes visible/usable", "The feature must be re-purchased separately for each user", "The feature only activates after 30 days of account tenure", "Click-to-Call only works for users created in the last week"], "correct": 0}, {"id": 34, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions — Mobile App", "question": "A client suggests that counsellors should not be able to add notes on leads they don't own, and flags the current behavior (which allows it) as a bug. How should this be classified?", "options": ["This should be logged directly as a critical security bug and escalated urgently", "This is existing, intended system behavior — not every disagreement with current behavior is a defect; this should be treated as a feature enhancement request and routed to Product for prioritization, not as a bug", "This can be fixed instantly by disabling the Notes feature entirely", "This only happens on the mobile app and is irrelevant to web users"], "correct": 1}, {"id": 35, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions — Echo", "question": "A client can't see conversation responses on an integrated chat tool (e.g., Echo) for certain users, sometimes getting a 404 error. What configuration nuance might explain this?", "options": ["When WhatsApp Business (WABA) is configured on a specific extension, priority is given to that extension configuration for showing responses — this is expected behavior tied to how the extension is set up, not a defect", "Echo requires a separate license per user to view any response", "404 errors always indicate the account has been deleted", "Echo responses are only visible to the original creator of the conversation"], "correct": 0}, {"id": 36, "section": "Access, Permissions & Feature Scope", "module": "Form and Automation — Application Form", "question": "A client reports an application/form's completion status appears inconsistent — some records show \"Completed\" after finishing only part of a multi-part form, while records that finished the true final part show \"In Progress.\" What configuration detail explains this?", "options": ["The form-completion trigger may be configured against an earlier part (e.g., Part 1) instead of the actual final part of the client's process (e.g., Part 2) — aligning the trigger with the correct final step resolves the mismatch", "Form completion status is randomly assigned and cannot be relied upon", "Completion status only updates once every 24 hours", "Multi-part forms are not supported and always show incorrect status"], "correct": 0}, {"id": 37, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions — Mobile App", "question": "A client sees a stage/option (e.g., a specific application stage) rendering differently between the mobile app and web for the same lead. What's a likely explanation before assuming a mobile app defect?", "options": ["On web, if only one application form is available it may get auto-selected and shown by default, whereas mobile may require the user to explicitly select the form first — leading to an apparent difference until the correct form is chosen", "The mobile app only supports half the features of the web platform, by design", "Application stages sync between mobile and web only once per day", "This always indicates the mobile app version is outdated"], "correct": 0}, {"id": 38, "section": "Access, Permissions & Feature Scope", "module": "Configurations or Permissions — Permission", "question": "A client reports a user is suddenly seeing admin-like options (e.g., reassign, broader visibility) that they shouldn't have, despite nothing being intentionally changed. What should be checked first?", "options": ["Immediately assume a security breach and lock the entire account", "Review the user's current role/permission configuration — an unintended permission change (even one made internally) can grant broader access than intended, and correcting the role setting resolves it", "This is expected behavior for all users after 90 days", "Admin-like options appear randomly and are purely cosmetic"], "correct": 1}, {"id": 39, "section": "Domain, DNS & Environment Configuration", "module": "Configurations or Permissions — Team and User (Domain/DNS Configuration)", "question": "A client reports being unable to activate their account, or that a registration/verification link doesn't redirect correctly — and this started right after they changed their company's domain or subdomain. What is the most likely root cause?", "options": ["The account itself has been deactivated at the backend — request Product to reactivate it", "The required DNS records (e.g., CNAME) were not updated/propagated on the client's domain side after the change — sharing/re-configuring the correct DNS records resolves it", "There's a temporary server outage affecting all activation emails", "The user's email inbox is full and can't receive new emails"], "correct": 1}, {"id": 40, "section": "Domain, DNS & Environment Configuration", "module": "App and Extensions — Telephony", "question": "A client's telephony call logs show call duration but the calls aren't reflecting in the lead/candidate timeline. What setup-related possibility should be checked?", "options": ["Whether the account's telephony setup is still on an older/legacy configuration in the system rather than the current one — migrating to the current configuration is often the fix", "Whether the telephony vendor has gone out of business", "Whether call logs are only visible on weekdays", "Whether the candidate's number was entered with a country code"], "correct": 0}]}, "sample-test-2": {"name": "Sample Test 2 (replace me)", "description": "This is a placeholder test showing how a second assessment plugs into the same app. Replace this entry's questions with real content whenever you're ready.", "questions": [{"id": 1, "section": "Sample Section — Replace Me", "module": "Sample Module", "question": "This is a placeholder question. Replace the TESTS['sample-test-2'] object in the script with real content for your second test.", "options": ["Placeholder option A", "Placeholder option B", "Placeholder option C", "Placeholder option D"], "correct": 0}, {"id": 2, "section": "Sample Section — Replace Me", "module": "Sample Module", "question": "Another placeholder question, just to show the app supports multiple questions per test.", "options": ["Placeholder option A", "Placeholder option B", "Placeholder option C", "Placeholder option D"], "correct": 2}, {"id": 3, "section": "Another Sample Section", "module": "Sample Module 2", "question": "A third placeholder question, demonstrating multiple sections within one test.", "options": ["Placeholder option A", "Placeholder option B", "Placeholder option C", "Placeholder option D"], "correct": 1}]}};
 
 // ---------- Config ----------
-// PASTE your deployed Apps Script Web App URL below (ends in /exec)
 const BACKEND_URL = "https://script.google.com/a/macros/meritto.com/s/AKfycbzeVf_4QSXQZYR8oBw5uZphTDG6BaF3Pky0OQgbj8240rHbX3TK2WiPWxg98_xmaMhP/exec";
-
 const PASS_PCT = 80;
 const ADMIN_CODE = "meritto2026";
 const LETTERS = ["A","B","C","D"];
-
-const SECTIONS = [...new Set(QUESTIONS.map(q => q.section))];
-const TOTAL_Q = QUESTIONS.length;
+const TEST_IDS = Object.keys(TESTS);
 
 const state = {
-  view: "landing",          // landing | test | report | admin-gate | admin | config-missing
-  name: "",
+  view: "login",   // login | test-select | test | report | admin-gate | admin
+  email: "",
+  emailChecking: false,
+  testStatuses: {},     // { [testId]: submissionEntry }
+  progressMap: {},       // { [testId]: progressEntry }
+  testId: null,
   answers: {},
   currentIndex: 0,
   result: null,
+  viewingPastResult: false,
   reviewFilter: "all",
   adminUnlocked: false,
   adminCodeInput: "",
   adminError: false,
+  adminTestId: TEST_IDS[0],
   submissions: [],
   adminLoading: true,
   selectedSubmissionIdx: null,
-  resumeChecked: false,
-  resumeData: null,
-  checkingName: false,
-  priorSubmission: null,
-  viewingPastResult: false,
 };
 
-// ---------- Client identity (anonymous, no login) ----------
+// ---------- Helpers for the currently selected test ----------
+function currentTest(){ return TESTS[state.testId]; }
+function currentQuestions(){ return currentTest().questions; }
+function currentSections(){ return [...new Set(currentQuestions().map(q => q.section))]; }
+function currentTotalQ(){ return currentQuestions().length; }
+
+// ---------- Client identity (anonymous device id, paired with email) ----------
 function getClientId(){
   let id;
   try { id = localStorage.getItem('ops_quiz_client_id'); } catch(e) { id = null; }
@@ -294,79 +325,74 @@ function getClientId(){
 }
 const CLIENT_ID = getClientId();
 
-// ---------- Backend API helpers ----------
+function backendConfigured(){
+  return BACKEND_URL && BACKEND_URL.indexOf('PASTE_YOUR') === -1;
+}
+
+// ---------- Backend API ----------
 async function apiGet(params){
   const url = BACKEND_URL + '?' + new URLSearchParams(params).toString();
   const res = await fetch(url);
   return await res.json();
 }
-
 async function apiPost(payload){
   const res = await fetch(BACKEND_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // keeps this a CORS "simple request"
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(payload)
   });
   return await res.json();
 }
 
-function backendConfigured(){
-  return BACKEND_URL && BACKEND_URL.indexOf('PASTE_YOUR') === -1;
-}
-
-async function loadSubmissions() {
+async function fetchStatusForEmail(email){
   try {
-    const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE });
-    return data.submissions || [];
-  } catch (e) { return []; }
+    const data = await apiGet({ action: 'getStatusForEmail', email: email });
+    return data.statuses || {};
+  } catch(e) { return {}; }
 }
-
-async function checkPriorSubmission(name) {
+async function fetchAllProgress(){
   try {
-    const data = await apiGet({ action: 'getSubmissionByName', name: name });
-    if (data && data.found) return data.submission;
-    return null;
-  } catch (e) { return null; }
+    const data = await apiGet({ action: 'getAllProgress', clientId: CLIENT_ID });
+    return data.progress || {};
+  } catch(e) { return {}; }
 }
-
-async function saveSubmissionRemote(name, result) {
-  await apiPost({ action: 'submit', clientId: CLIENT_ID, name: name, result: result });
-}
-
-async function loadProgress(){
+async function fetchProgress(testId){
   try {
-    const data = await apiGet({ action: 'getProgress', clientId: CLIENT_ID });
-    if (data && data.found) {
-      return { name: data.name, answers: data.answers, currentIndex: data.currentIndex, timestamp: data.timestamp };
-    }
-    return null;
-  } catch (e) { return null; }
+    const data = await apiGet({ action: 'getProgress', clientId: CLIENT_ID, testId: testId });
+    return (data && data.found) ? data : null;
+  } catch(e) { return null; }
 }
-
-async function saveProgress(){
+async function saveProgressRemote(){
   try {
     await apiPost({
-      action: 'saveProgress',
-      clientId: CLIENT_ID,
-      name: state.name,
-      answers: state.answers,
-      currentIndex: state.currentIndex
+      action: 'saveProgress', clientId: CLIENT_ID, testId: state.testId,
+      name: state.email, answers: state.answers, currentIndex: state.currentIndex
     });
-  } catch(e) { /* non-fatal */ }
+  } catch(e) {}
 }
-
-async function clearProgress(){
-  try { await apiPost({ action: 'clearProgress', clientId: CLIENT_ID }); } catch(e) { /* non-fatal */ }
+async function clearProgressRemote(testId){
+  try { await apiPost({ action: 'clearProgress', clientId: CLIENT_ID, testId: testId }); } catch(e) {}
+}
+async function submitRemote(result){
+  await apiPost({ action: 'submit', clientId: CLIENT_ID, testId: state.testId, name: state.email, result: result });
+}
+async function loadSubmissionsForAdmin(testId){
+  try {
+    const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE, testId: testId });
+    return data.submissions || [];
+  } catch(e) { return []; }
 }
 
 // ---------- Scoring ----------
-function computeResult(answers) {
+function computeResult(answers){
+  const questions = currentQuestions();
+  const sections = currentSections();
   let correctCount = 0;
   const perQuestion = [];
   const sectionMap = {};
-  SECTIONS.forEach(s => sectionMap[s] = {correct:0, total:0});
+  sections.forEach(s => sectionMap[s] = {correct:0, total:0});
 
-  QUESTIONS.forEach(q => {
+  questions.forEach(q => {
     const chosen = answers[q.id];
     const isCorrect = chosen === q.correct;
     if (isCorrect) correctCount++;
@@ -378,12 +404,12 @@ function computeResult(answers) {
     });
   });
 
-  const total = QUESTIONS.length;
+  const total = questions.length;
   const pct = Math.round((correctCount/total)*100);
   return {
     correctCount, total, pct,
     pass: pct >= PASS_PCT,
-    sectionScores: SECTIONS.map(s => ({ section: s, ...sectionMap[s], pct: Math.round((sectionMap[s].correct/sectionMap[s].total)*100) })),
+    sectionScores: sections.map(s => ({ section: s, ...sectionMap[s], pct: Math.round((sectionMap[s].correct/sectionMap[s].total)*100) })),
     perQuestion,
     timestamp: new Date().toISOString()
   };
@@ -392,112 +418,131 @@ function computeResult(answers) {
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
-
 function fmtDate(iso){
   const d = new Date(iso);
   return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) + ' ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
-
 function scoreColor(pct){
   if (pct >= PASS_PCT) return 'var(--green)';
   if (pct >= 60) return 'var(--amber)';
   return 'var(--red)';
 }
+function isValidEmail(str){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str.trim());
+}
 
-// ---------- Views ----------
-
-function renderTopbar(showBack){
+// ---------- Shared ----------
+function renderTopbar(mode){
+  // mode: 'login' | 'loggedIn' | 'inTest'
+  let right = '';
+  if (mode === 'login'){
+    right = `<button class="link-btn" onclick="goAdmin()">Team Report</button>`;
+  } else if (mode === 'loggedIn'){
+    right = `
+      <div class="user-chip">
+        ${escapeHtml(state.email)}
+        <span class="logout" onclick="logout()">Log out</span>
+      </div>
+      <button class="link-btn" onclick="goAdmin()">Team Report</button>`;
+  } else if (mode === 'inTest'){
+    right = `<button class="link-btn" onclick="exitToTestSelect()">← Tests</button>`;
+  }
   return `
     <div class="topbar">
-      <div class="brand"><span class="dot"></span> Ops Knowledge Check</div>
-      <div class="actions">
-        ${showBack ? `<button class="link-btn" onclick="goHome()">Exit</button>` : `<button class="link-btn" onclick="goAdmin()">Team Report</button>`}
-      </div>
+      <div class="brand"><span class="dot"></span> Meritto Assessments</div>
+      <div class="actions">${right}</div>
     </div>`;
 }
 
 function renderConfigMissing(){
   return `
-    ${renderTopbar(false)}
+    ${renderTopbar('login')}
     <div class="landing-wrap">
       <div class="card landing-card pad">
         <div class="eyebrow" style="color:var(--red);">Setup needed</div>
         <h1 style="font-size:20px;">Backend URL not configured</h1>
-        <p class="sub">
-          This page needs the Apps Script Web App URL pasted into the <code>BACKEND_URL</code>
-          constant near the top of the script before it can save progress or results.
-          Open this HTML file in a text editor, replace
-          <code>PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE</code> with your deployed
-          <code>/exec</code> URL, save, and re-upload/host it again.
-        </p>
+        <p class="sub">Paste your Apps Script Web App URL into the <code>BACKEND_URL</code> constant near the top of the script, save, and re-host this file.</p>
       </div>
     </div>`;
 }
 
-function renderLanding(){
-  if (!state.resumeChecked){
-    return `${renderTopbar(false)}<div class="landing-wrap"><div class="empty-state">Loading…</div></div>`;
-  }
-
-  const resumeCard = state.resumeData ? `
-    <div class="card landing-card pad" style="margin-bottom:16px;border-color:var(--amber);background:#FFFBF3;">
-      <div class="eyebrow" style="color:var(--navy-2);">In-progress test found</div>
-      <h1 style="font-size:19px;margin:8px 0 4px;">Welcome back${state.resumeData.name ? ', ' + escapeHtml(state.resumeData.name) : ''}</h1>
-      <p class="sub" style="margin-bottom:16px;">
-        You have ${Object.keys(state.resumeData.answers||{}).length} of ${TOTAL_Q} questions answered,
-        last saved ${fmtDate(state.resumeData.timestamp)}.
-      </p>
-      <button class="btn btn-primary" onclick="resumeTest()">Resume where I left off →</button>
-      <button class="btn btn-ghost" style="width:100%;margin-top:10px;" onclick="discardResume()">Start over instead</button>
-    </div>` : '';
-
+// ---------- Login ----------
+function renderLogin(){
   return `
-    ${renderTopbar(false)}
-    <div class="landing-wrap">
-      <div style="max-width:480px;width:100%;">
-        ${resumeCard}
-        ${!state.resumeData ? `
-        <div class="card landing-card pad">
-          <div class="eyebrow">Product &amp; Ops Enablement</div>
-          <h1>Distinguishing Real Bugs from Ops-End Gaps</h1>
-          <p class="sub">40 real cases that were parked to Product as suspected bugs but turned out to be configuration, permission, or process understanding gaps. Read each scenario and pick the best explanation. You can leave and resume anytime — your progress is saved automatically.</p>
-          <div class="field">
-            <label>Your work email address</label>
-            <input id="nameInput" type="email" placeholder="e.g. priya.sharma@meritto.com" value="${escapeHtml(state.name)}" oninput="state.name=this.value" onkeydown="if(event.key==='Enter')startTest()"/>
-          </div>
-          <button class="btn btn-primary" ${state.checkingName ? 'disabled style="opacity:.6;"' : ''} onclick="startTest()">${state.checkingName ? 'Checking…' : 'Begin Assessment →'}</button>
-          <div class="stat-row">
-            <div class="s"><div class="n">40</div><div class="l">Questions</div></div>
-            <div class="s"><div class="n">~25</div><div class="l">Minutes</div></div>
-            <div class="s"><div class="n">${PASS_PCT}%</div><div class="l">Pass mark</div></div>
-          </div>
-        </div>` : ''}
-      </div>
-    </div>`;
-}
-
-function renderPriorChoice(){
-  const sub = state.priorSubmission;
-  const r = sub.result;
-  return `
-    ${renderTopbar(false)}
+    ${renderTopbar('login')}
     <div class="landing-wrap">
       <div class="card landing-card pad">
-        <div class="eyebrow" style="color:var(--navy-2);">Previous submission found</div>
-        <h1 style="font-size:19px;margin:8px 0 4px;">Welcome back, ${escapeHtml(sub.name)}</h1>
-        <p class="sub" style="margin-bottom:18px;">
-          You already completed this assessment on ${fmtDate(sub.timestamp)}, scoring
-          <b>${r.correctCount} / ${r.total} (${r.pct}%)</b>.
-        </p>
-        <button class="btn btn-primary" onclick="viewPriorResult()">View my result →</button>
-        <button class="btn btn-ghost" style="width:100%;margin-top:10px;" onclick="retakeFromPrior()">Retake the assessment</button>
+        <div class="eyebrow">Meritto Ops Enablement</div>
+        <h1>Sign in to take an assessment</h1>
+        <p class="sub">Enter your work email to see the assessments available to you and pick up any test you've started or completed before.</p>
+        <div class="field">
+          <label>Your work email address</label>
+          <input type="email" placeholder="e.g. priya.sharma@meritto.com" value="${escapeHtml(state.email)}" oninput="state.email=this.value" onkeydown="if(event.key==='Enter')login()"/>
+        </div>
+        <button class="btn btn-primary" ${state.emailChecking ? 'disabled style="opacity:.6;"' : ''} onclick="login()">${state.emailChecking ? 'Checking…' : 'Continue →'}</button>
       </div>
     </div>`;
 }
 
+// ---------- Test selection ----------
+function testCardStatus(testId){
+  const sub = state.testStatuses[testId];
+  const prog = state.progressMap[testId];
+  if (sub) return { kind: 'completed', sub };
+  if (prog && prog.answers && Object.keys(prog.answers).length > 0) return { kind: 'in-progress', prog };
+  return { kind: 'not-started' };
+}
+
+function renderTestSelect(){
+  const cards = TEST_IDS.map(testId => {
+    const test = TESTS[testId];
+    const st = testCardStatus(testId);
+    const total = test.questions.length;
+
+    let pill, actions;
+    if (st.kind === 'completed'){
+      pill = `<span class="status-pill completed">Completed — ${st.sub.result.pct}%</span>`;
+      actions = `
+        <button class="btn btn-primary" onclick="viewPastResult('${testId}')">View my result</button>
+        <button class="btn btn-ghost" onclick="retakeTest('${testId}')">Retake</button>`;
+    } else if (st.kind === 'in-progress'){
+      const answered = Object.keys(st.prog.answers).length;
+      pill = `<span class="status-pill in-progress">In progress — ${answered}/${total}</span>`;
+      actions = `
+        <button class="btn btn-primary" onclick="resumeTest('${testId}')">Resume</button>
+        <button class="btn btn-ghost" onclick="retakeTest('${testId}')">Start over</button>`;
+    } else {
+      pill = `<span class="status-pill not-started">Not started</span>`;
+      actions = `<button class="btn btn-primary" onclick="beginTest('${testId}')">Start test</button>`;
+    }
+
+    return `
+      <div class="card test-card">
+        <div class="ttop">
+          <div>
+            <h3>${escapeHtml(test.name)}</h3>
+            <p>${escapeHtml(test.description || '')}</p>
+          </div>
+          ${pill}
+        </div>
+        <div class="tactions">${actions}</div>
+      </div>`;
+  }).join("");
+
+  return `
+    ${renderTopbar('loggedIn')}
+    <div class="app">
+      <h2 style="margin-bottom:4px;">Available Assessments</h2>
+      <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0 0 20px;">Signed in as ${escapeHtml(state.email)}</p>
+      ${cards}
+    </div>`;
+}
+
+// ---------- Test taking ----------
 function renderNavigator(){
+  const questions = currentQuestions();
   let dots = "";
-  QUESTIONS.forEach((q, i) => {
+  questions.forEach((q, i) => {
     const answered = state.answers[q.id] !== undefined;
     const isCurrent = i === state.currentIndex;
     let cls = "nav-dot";
@@ -509,10 +554,12 @@ function renderNavigator(){
 }
 
 function renderTest(){
-  const q = QUESTIONS[state.currentIndex];
+  const questions = currentQuestions();
+  const totalQ = questions.length;
+  const q = questions[state.currentIndex];
   const chosen = state.answers[q.id];
   const answeredCount = Object.keys(state.answers).length;
-  const isLast = state.currentIndex === TOTAL_Q - 1;
+  const isLast = state.currentIndex === totalQ - 1;
   const isFirst = state.currentIndex === 0;
 
   let optsHtml = "";
@@ -525,13 +572,13 @@ function renderTest(){
   });
 
   return `
-    ${renderTopbar(true)}
+    ${renderTopbar('inTest')}
     <div class="app">
       <div class="progress-shell">
         <div class="inner">
-          <div class="qcounter">Question <b>${state.currentIndex+1}</b> of ${TOTAL_Q}</div>
-          <div class="progress-bar"><div class="fill" style="width:${Math.round((answeredCount/TOTAL_Q)*100)}%"></div></div>
-          <div class="progress-count">${answeredCount} / ${TOTAL_Q} answered</div>
+          <div class="qcounter">Question <b>${state.currentIndex+1}</b> of ${totalQ}</div>
+          <div class="progress-bar"><div class="fill" style="width:${Math.round((answeredCount/totalQ)*100)}%"></div></div>
+          <div class="progress-count">${answeredCount} / ${totalQ} answered</div>
         </div>
       </div>
 
@@ -557,6 +604,7 @@ function renderTest(){
     </div>`;
 }
 
+// ---------- Report ----------
 function renderGauge(pct){
   const r = 62, c = 2*Math.PI*r;
   const off = c - (pct/100)*c;
@@ -613,44 +661,41 @@ function renderReviewList(perQuestion, filter){
 
 function renderReport(){
   const r = state.result;
+  const testName = TESTS[state.testId] ? TESTS[state.testId].name : '';
   return `
-    ${renderTopbar(true)}
+    ${renderTopbar('inTest')}
     <div class="app">
       ${state.viewingPastResult ? `
         <div class="card pad" style="margin-bottom:16px;border-color:var(--navy-2);background:#EEF3F8;">
-          <b>Viewing a previous submission</b> — this was your result from ${fmtDate(r.timestamp)}.
-          Go to <span style="text-decoration:underline;cursor:pointer;" onclick="goHome()">Exit</span> and enter your name again if you'd like to retake it.
+          <b>Viewing a previous submission</b> — ${escapeHtml(testName)}, from ${fmtDate(r.timestamp)}.
         </div>` : ''}
       <div class="card score-hero">
         ${renderGauge(r.pct)}
         <div class="score-side">
           <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
-          <h2 style="margin-top:10px;">${escapeHtml(state.name)}, you scored ${r.correctCount} / ${r.total}</h2>
+          <h2 style="margin-top:10px;">${escapeHtml(testName)} — ${r.correctCount} / ${r.total}</h2>
           <p>${r.pass
-            ? "Strong grasp of the ops-vs-bug patterns covered. Review any missed items below to close the remaining gaps."
-            : `Pass mark is ${PASS_PCT}%. Review the incorrect answers below — each one links back to a real pattern worth remembering before parking similar cases to Product.`}</p>
+            ? "Strong grasp of the material covered. Review any missed items below to close the remaining gaps."
+            : `Pass mark is ${PASS_PCT}%. Review the incorrect answers below.`}</p>
         </div>
       </div>
 
       ${renderBreakdown(r.sectionScores)}
 
-      <div class="section-title-row">
-        <h3>Review your answers</h3>
-      </div>
+      <div class="section-title-row"><h3>Review your answers</h3></div>
       <div class="filter-row">
         <div class="filter-chip ${state.reviewFilter==='all'?'active':''}" onclick="setReviewFilter('all')">All (${r.total})</div>
         <div class="filter-chip ${state.reviewFilter==='incorrect'?'active':''}" onclick="setReviewFilter('incorrect')">Incorrect (${r.total-r.correctCount})</div>
         <div class="filter-chip ${state.reviewFilter==='correct'?'active':''}" onclick="setReviewFilter('correct')">Correct (${r.correctCount})</div>
       </div>
-      <div style="margin-top:14px;">
-        ${renderReviewList(r.perQuestion, state.reviewFilter)}
-      </div>
+      <div style="margin-top:14px;">${renderReviewList(r.perQuestion, state.reviewFilter)}</div>
     </div>`;
 }
 
+// ---------- Admin ----------
 function renderAdminGate(){
   return `
-    ${renderTopbar(true)}
+    ${renderTopbar('login')}
     <div class="gate-wrap">
       <div class="card landing-card pad">
         <div class="eyebrow">Manager Access</div>
@@ -685,21 +730,26 @@ function renderAdminDetail(sub){
 }
 
 function renderAdmin(){
+  const tabs = TEST_IDS.map(tid => `
+    <div class="test-tab ${state.adminTestId===tid?'active':''}" onclick="switchAdminTest('${tid}')">${escapeHtml(TESTS[tid].name)}</div>
+  `).join("");
+
   if (state.adminLoading){
-    return `${renderTopbar(true)}<div class="app"><div class="empty-state">Loading team results…</div></div>`;
+    return `${renderTopbar('login')}<div class="app wide"><div class="test-tabs">${tabs}</div><div class="empty-state">Loading team results…</div></div>`;
   }
 
   if (state.selectedSubmissionIdx !== null){
     const sub = state.submissions[state.selectedSubmissionIdx];
-    return `${renderTopbar(true)}<div class="app wide">${renderAdminDetail(sub)}</div>`;
+    return `${renderTopbar('login')}<div class="app wide">${renderAdminDetail(sub)}</div>`;
   }
 
   const subs = state.submissions;
   if (subs.length === 0){
-    return `${renderTopbar(true)}<div class="app wide">
+    return `${renderTopbar('login')}<div class="app wide">
+      <div class="test-tabs">${tabs}</div>
       <div class="empty-state card pad">
         <div class="big">📋</div>
-        No submissions yet. Share this test link with your team — results will appear here as they complete it.
+        No submissions yet for "${escapeHtml(TESTS[state.adminTestId].name)}".
       </div>
     </div>`;
   }
@@ -708,15 +758,16 @@ function renderAdmin(){
   const passCount = subs.filter(s=>s.result.pass).length;
   const passRate = Math.round((passCount/subs.length)*100);
 
+  const sections = [...new Set(TESTS[state.adminTestId].questions.map(q=>q.section))];
   const secAgg = {};
-  SECTIONS.forEach(s => secAgg[s] = {correct:0,total:0});
+  sections.forEach(s => secAgg[s] = {correct:0,total:0});
   subs.forEach(s => s.result.sectionScores.forEach(ss => {
+    if (!secAgg[ss.section]) secAgg[ss.section] = {correct:0,total:0};
     secAgg[ss.section].correct += ss.correct;
     secAgg[ss.section].total += ss.total;
   }));
-  const weakSections = SECTIONS.map(s => ({
-    section: s,
-    pct: Math.round((secAgg[s].correct/secAgg[s].total)*100)
+  const weakSections = Object.keys(secAgg).map(s => ({
+    section: s, pct: Math.round((secAgg[s].correct/secAgg[s].total)*100)
   })).sort((a,b)=>a.pct-b.pct);
 
   const rows = subs.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map((s) => {
@@ -738,9 +789,10 @@ function renderAdmin(){
     </div>`).join("");
 
   return `
-    ${renderTopbar(true)}
+    ${renderTopbar('login')}
     <div class="app wide">
-      <h2 style="margin-bottom:4px;">Team Performance</h2>
+      <div class="test-tabs">${tabs}</div>
+      <h2 style="margin-bottom:4px;">${escapeHtml(TESTS[state.adminTestId].name)} — Team Performance</h2>
       <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${subs.length} submission${subs.length!==1?'s':''} recorded</p>
 
       <div class="kpi-grid">
@@ -764,134 +816,141 @@ function renderAdmin(){
     </div>`;
 }
 
-// ---------- Event handlers ----------
 function render(){
   document.getElementById("root").innerHTML =
     state.view === "config-missing" ? renderConfigMissing() :
-    state.view === "landing" ? renderLanding() :
-    state.view === "prior-choice" ? renderPriorChoice() :
+    state.view === "login" ? renderLogin() :
+    state.view === "test-select" ? renderTestSelect() :
     state.view === "test" ? renderTest() :
     state.view === "report" ? renderReport() :
     state.view === "admin-gate" ? renderAdminGate() :
     state.view === "admin" ? renderAdmin() : "";
 }
 
-async function checkResume(){
-  const data = await loadProgress();
-  if (data && data.answers && Object.keys(data.answers).length > 0){
-    state.resumeData = data;
-  }
-  state.resumeChecked = true;
+// ---------- Login / test selection ----------
+async function login(){
+  const email = state.email.trim().toLowerCase();
+  if (!email){ alert("Please enter your work email address."); return; }
+  if (!isValidEmail(email)){ alert("Please enter a valid email address (e.g. name@company.com)."); return; }
+  state.email = email;
+  state.emailChecking = true;
+  render();
+
+  const [statuses, progress] = await Promise.all([
+    fetchStatusForEmail(email),
+    fetchAllProgress()
+  ]);
+  state.testStatuses = statuses;
+  state.progressMap = progress;
+  state.emailChecking = false;
+  state.view = "test-select";
   render();
 }
 
-function resumeTest(){
-  state.name = state.resumeData.name || "";
-  state.answers = state.resumeData.answers || {};
-  state.currentIndex = Math.min(state.resumeData.currentIndex || 0, TOTAL_Q - 1);
-  state.resumeData = null;
-  state.view = "test";
-  render();
-  window.scrollTo(0,0);
-}
-
-async function discardResume(){
-  await clearProgress();
-  state.resumeData = null;
+function logout(){
+  state.email = "";
+  state.testStatuses = {};
+  state.progressMap = {};
+  state.testId = null;
+  state.view = "login";
   render();
 }
 
-function isValidEmail(str){
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str.trim());
-}
-
-async function startTest(){
-  const email = state.name.trim().toLowerCase();
-  if (!email){
-    alert("Please enter your work email address to begin.");
-    return;
-  }
-  if (!isValidEmail(email)){
-    alert("Please enter a valid email address (e.g. name@company.com).");
-    return;
-  }
-  state.name = email;
-  state.checkingName = true;
+function exitToTestSelect(){
+  state.view = "test-select";
+  state.answers = {};
+  state.result = null;
+  state.currentIndex = 0;
+  state.testId = null;
   render();
-  const priorSub = await checkPriorSubmission(state.name);
-  state.checkingName = false;
-  if (priorSub){
-    state.priorSubmission = priorSub;
-    state.view = "prior-choice";
-    render();
-    return;
-  }
-  beginFreshTest();
+  // refresh statuses in case something changed
+  refreshTestSelectData();
 }
 
-function beginFreshTest(){
+async function refreshTestSelectData(){
+  const [statuses, progress] = await Promise.all([
+    fetchStatusForEmail(state.email),
+    fetchAllProgress()
+  ]);
+  state.testStatuses = statuses;
+  state.progressMap = progress;
+  render();
+}
+
+function beginTest(testId){
+  state.testId = testId;
   state.answers = {};
   state.currentIndex = 0;
   state.viewingPastResult = false;
   state.view = "test";
   render();
   window.scrollTo(0,0);
-  saveProgress();
+  saveProgressRemote();
 }
 
-function viewPriorResult(){
-  state.name = state.priorSubmission.name;
-  state.result = state.priorSubmission.result;
-  state.viewingPastResult = true;
-  state.view = "report";
-  state.reviewFilter = "all";
+function resumeTest(testId){
+  state.testId = testId;
+  const prog = state.progressMap[testId];
+  state.answers = (prog && prog.answers) || {};
+  state.currentIndex = Math.min((prog && prog.currentIndex) || 0, currentTotalQ() - 1);
+  state.viewingPastResult = false;
+  state.view = "test";
   render();
   window.scrollTo(0,0);
 }
 
-function retakeFromPrior(){
-  state.priorSubmission = null;
-  beginFreshTest();
+async function retakeTest(testId){
+  await clearProgressRemote(testId);
+  beginTest(testId);
 }
 
+function viewPastResult(testId){
+  const sub = state.testStatuses[testId];
+  state.testId = testId;
+  state.result = sub.result;
+  state.viewingPastResult = true;
+  state.reviewFilter = "all";
+  state.view = "report";
+  render();
+  window.scrollTo(0,0);
+}
+
+// ---------- Test taking ----------
 function selectOption(qid, idx){
   state.answers[qid] = idx;
   render();
-  saveProgress();
+  saveProgressRemote();
 }
 
 function goNext(){
-  if (state.currentIndex < TOTAL_Q - 1){
+  if (state.currentIndex < currentTotalQ() - 1){
     state.currentIndex++;
     render();
     window.scrollTo(0,0);
-    saveProgress();
+    saveProgressRemote();
   }
 }
-
 function goPrev(){
   if (state.currentIndex > 0){
     state.currentIndex--;
     render();
     window.scrollTo(0,0);
-    saveProgress();
+    saveProgressRemote();
   }
 }
-
 function jumpToQuestion(idx){
   state.currentIndex = idx;
   render();
   window.scrollTo(0,0);
-  saveProgress();
+  saveProgressRemote();
 }
 
 function attemptSubmit(){
+  const questions = currentQuestions();
   const answeredCount = Object.keys(state.answers).length;
-  if (answeredCount < TOTAL_Q){
-    const firstUnanswered = QUESTIONS.findIndex(q => state.answers[q.id] === undefined);
-    if (!confirm(`You still have ${TOTAL_Q - answeredCount} unanswered question(s). Go to the first unanswered question?`)){
-      return;
-    }
+  if (answeredCount < questions.length){
+    const firstUnanswered = questions.findIndex(q => state.answers[q.id] === undefined);
+    if (!confirm(`You still have ${questions.length - answeredCount} unanswered question(s). Go to the first unanswered question?`)) return;
     state.currentIndex = firstUnanswered;
     render();
     window.scrollTo(0,0);
@@ -903,11 +962,13 @@ function attemptSubmit(){
 async function submitTest(){
   const result = computeResult(state.answers);
   state.result = result;
+  state.viewingPastResult = false;
   state.view = "report";
   render();
   window.scrollTo(0,0);
   try {
-    await saveSubmissionRemote(state.name, result);
+    await submitRemote(result);
+    state.testStatuses[state.testId] = { timestamp: result.timestamp, email: state.email, testId: state.testId, result: result };
   } catch(e) { /* still show the report even if save fails */ }
 }
 
@@ -916,17 +977,7 @@ function setReviewFilter(f){
   render();
 }
 
-function goHome(){
-  state.view = "landing";
-  state.answers = {};
-  state.result = null;
-  state.currentIndex = 0;
-  state.priorSubmission = null;
-  state.viewingPastResult = false;
-  render();
-  checkResume();
-}
-
+// ---------- Admin ----------
 function goAdmin(){
   state.view = state.adminUnlocked ? "admin" : "admin-gate";
   state.selectedSubmissionIdx = null;
@@ -947,10 +998,16 @@ async function checkAdminCode(){
   }
 }
 
+function switchAdminTest(testId){
+  state.adminTestId = testId;
+  state.selectedSubmissionIdx = null;
+  loadAdminData();
+}
+
 async function loadAdminData(){
   state.adminLoading = true;
   render();
-  const subs = await loadSubmissions();
+  const subs = await loadSubmissionsForAdmin(state.adminTestId);
   state.submissions = subs;
   state.adminLoading = false;
   render();
@@ -962,7 +1019,6 @@ if (!backendConfigured()){
   render();
 } else {
   render();
-  checkResume();
 }
 </script>
 </body>
