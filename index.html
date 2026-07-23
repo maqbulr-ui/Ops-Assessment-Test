@@ -449,10 +449,13 @@ function startTimerFor(testId, startedAtIso){
 }
 function stopTimer(){
   if (timerHandle){ clearInterval(timerHandle); timerHandle = null; }
+  testStartedAtMs = null;
+  testDurationSec = 0;
 }
 function updateTimerTick(){
   const el = document.getElementById('timer-display');
   if (!el){ return; }
+  if (!testStartedAtMs || testDurationSec <= 0){ return; } // timer not actually initialized yet — safe no-op
   const elapsed = Math.floor((Date.now() - testStartedAtMs) / 1000);
   const remaining = testDurationSec - elapsed;
   if (remaining <= 0){
@@ -1073,9 +1076,9 @@ async function beginTest(testId){
   state.viewingPastResult = false;
   state.timeExpired = false;
   state.view = "test";
+  startTimerFor(testId, null);
   render();
   window.scrollTo(0,0);
-  startTimerFor(testId, null);
   saveProgressRemote();
 }
 
@@ -1090,9 +1093,9 @@ async function resumeTest(testId){
   state.viewingPastResult = false;
   state.timeExpired = false;
   state.view = "test";
+  startTimerFor(testId, prog && prog.startedAt ? prog.startedAt : null);
   render();
   window.scrollTo(0,0);
-  startTimerFor(testId, prog && prog.startedAt ? prog.startedAt : null);
 }
 
 async function retakeTest(testId){
