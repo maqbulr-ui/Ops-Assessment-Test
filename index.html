@@ -299,6 +299,12 @@
     padding:6px 12px;border-radius:8px;background:#EEF3F8;white-space:nowrap;
   }
   .timer-box.warn{background:var(--red-soft);color:var(--red);}
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(18,35,63,0.55);z-index:100;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-card{max-width:420px;width:100%;}
 </style>
 </head>
 <body>
@@ -311,6 +317,7 @@ const GOOGLE_CLIENT_ID = "690653029485-3rnbehrab4v2gqdhibqo6eqio6a5cnck.apps.goo
 const ALLOWED_EMAIL_DOMAIN = "meritto.com"; // hints Google's picker; the real enforcement happens server-side
 const PASS_PCT = 80;
 const ADMIN_CODE = "meritto2026";
+const SESSION_KEY = "ops_quiz_session";
 const LETTERS = ["A","B","C","D"];
 
 const state = {
@@ -331,6 +338,7 @@ const state = {
   result: null,
   viewingPastResult: false,
   timeExpired: false,
+  showLeaveWarning: false,
   reviewFilter: "all",
 
   adminUnlocked: false,
@@ -338,6 +346,10 @@ const state = {
   adminError: false,
   adminCatalog: [],
   adminTestId: null,
+  adminView: "per-test",       // "per-test" | "overall"
+  allSubmissions: [],
+  allSubmissionsLoaded: false,
+  adminOverallLoading: false,
   submissions: [],
   adminLoading: true,
   selectedSubmissionIdx: null,
@@ -429,6 +441,10 @@ async function loadSubmissionsForAdmin(testId){
   try { const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE, testId: testId }); return data.submissions || []; }
   catch(e) { return []; }
 }
+async function loadAllSubmissionsForAdmin(){
+  try { const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE }); return data.submissions || []; }
+  catch(e) { return []; }
+}
 
 async function ensureQuestionsLoaded(testId){
   if (!state.questionsCache[testId]){
@@ -514,6 +530,49 @@ function fmtDate(iso){
   const d = new Date(iso);
   return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) + ' ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
+// ---------- CSV export ----------
+function downloadCSV(filename, headers, rows){
+  const esc = (val) => {
+    const str = String(val === undefined || val === null ? '' : val);
+    if (/[",\n]/.test(str)) return '"' + str.replace(/"/g,'""') + '"';
+    return str;
+  };
+  const lines = [headers.map(esc).join(',')];
+  rows.forEach(r => lines.push(r.map(esc).join(',')));
+  const csv = lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function safeFilename(str){
+  return String(str).replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g,'').toLowerCase();
+}
+
+function aggregateSubmissionsByUser(subs){
+  const byUser = {};
+  subs.forEach(s => {
+    if (!byUser[s.name]) byUser[s.name] = { count: 0, totalPct: 0, passCount: 0, testIds: new Set() };
+    const u = byUser[s.name];
+    u.count++;
+    u.totalPct += s.result.pct;
+    if (s.result.pass) u.passCount++;
+    u.testIds.add(s.testId);
+  });
+  return Object.keys(byUser).map(email => {
+    const u = byUser[email];
+    return {
+      email, testsTaken: u.testIds.size, totalAttempts: u.count,
+      avgPct: Math.round(u.totalPct / u.count), passCount: u.passCount
+    };
+  }).sort((a,b) => b.avgPct - a.avgPct);
+}
+
 function scoreColor(pct){
   if (pct >= PASS_PCT) return 'var(--green)';
   if (pct >= 60) return 'var(--amber)';
@@ -534,7 +593,9 @@ function renderTopbar(mode){
       <button class="link-btn" onclick="goMyResults()">My Results</button>
       <button class="link-btn" onclick="goAdmin()">Team Report</button>`;
   } else if (mode === 'inTest'){
-    right = `<button class="link-btn" onclick="exitToTestSelect()">← Tests</button>`;
+    right = `<button class="link-btn" onclick="exitToTestSelect()">Home</button>`;
+  } else if (mode === 'takingTest'){
+    right = `<button class="link-btn" onclick="attemptLeaveTest()">Home</button>`;
   } else if (mode === 'admin'){
     right = `<button class="link-btn" onclick="goHomeFromAdmin()">Home</button>`;
   }
@@ -542,6 +603,14 @@ function renderTopbar(mode){
     <div class="topbar">
       <div class="brand"><span class="dot"></span> Meritto Assessments</div>
       <div class="actions">${right}</div>
+    </div>`;
+}
+
+function renderRestoringSession(){
+  return `
+    ${renderTopbar('login')}
+    <div class="landing-wrap">
+      <div class="loading-inline"><div class="spinner"></div> Signing you back in…</div>
     </div>`;
 }
 
@@ -676,6 +745,24 @@ function renderNavigator(){
   return `<div class="navigator">${dots}</div>`;
 }
 
+function renderLeaveWarningModal(){
+  if (!state.showLeaveWarning) return '';
+  const total = currentTotalQ();
+  const answeredCount = Object.keys(state.answers).length;
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) cancelLeaveWarning()">
+      <div class="card modal-card pad">
+        <h3 style="margin:0 0 10px;font-size:18px;">Leave this test?</h3>
+        <p style="color:var(--ink-mute);font-size:13.5px;line-height:1.55;margin:0 0 20px;">
+          You've answered ${answeredCount} of ${total} questions. Your progress is saved automatically, so you can come back and resume later — or submit now if you're finished.
+        </p>
+        <button class="btn btn-primary" onclick="confirmSubmitFromWarning()">Submit test now</button>
+        <button class="btn btn-ghost" style="width:100%;margin-top:10px;" onclick="confirmLeaveWithoutSubmitting()">Leave without submitting</button>
+        <button class="link-btn" style="display:block;margin:14px auto 0;color:var(--ink-mute);" onclick="cancelLeaveWarning()">Cancel, keep taking the test</button>
+      </div>
+    </div>`;
+}
+
 function renderTest(){
   const questions = currentQuestions();
   const totalQ = questions.length;
@@ -698,7 +785,7 @@ function renderTest(){
   const hasTimer = meta && meta.durationMinutes > 0;
 
   return `
-    ${renderTopbar('inTest')}
+    ${renderTopbar('takingTest')}
     <div class="app">
       <div class="progress-shell">
         <div class="inner">
@@ -728,7 +815,8 @@ function renderTest(){
           ? `<button class="btn btn-primary" style="width:auto;margin:0;" onclick="attemptSubmit()">Submit Test</button>`
           : `<button class="btn btn-primary" style="width:auto;margin:0;" onclick="goNext()">Next →</button>`}
       </div>
-    </div>`;
+    </div>
+    ${renderLeaveWarningModal()}`;
 }
 
 // ---------- Report ----------
@@ -825,6 +913,26 @@ function renderReport(){
 }
 
 // ---------- My Results (personal, dropdown-based like the admin view) ----------
+function renderMyOverallSummary(){
+  const subs = Object.values(state.testStatuses);
+  const totalTests = state.testCatalog.length;
+  const completed = subs.length;
+  if (completed === 0){
+    return `
+      <div class="card pad" style="margin-bottom:22px;">
+        <div style="color:var(--ink-mute);font-size:13.5px;">You haven't completed any assessments yet — 0 of ${totalTests} published.</div>
+      </div>`;
+  }
+  const avgPct = Math.round(subs.reduce((a,s)=>a+s.result.pct,0)/completed);
+  const passCount = subs.filter(s=>s.result.pass).length;
+  return `
+    <div class="kpi-grid" style="margin-bottom:22px;">
+      <div class="card kpi"><div class="n">${completed}/${totalTests}</div><div class="l">Assessments completed</div></div>
+      <div class="card kpi"><div class="n">${avgPct}%</div><div class="l">Your overall average score</div></div>
+      <div class="card kpi"><div class="n">${passCount}/${completed}</div><div class="l">Passed</div></div>
+    </div>`;
+}
+
 function renderMyResults(){
   if (state.testCatalog.length === 0){
     return `${renderTopbar('inTest')}<div class="app wide"><div class="empty-state card pad">No assessments published yet.</div></div>`;
@@ -843,6 +951,7 @@ function renderMyResults(){
 
   if (!sub){
     return `${renderTopbar('inTest')}<div class="app wide">
+      ${renderMyOverallSummary()}
       ${selector}
       <div class="empty-state card pad">
         You haven't completed "${escapeHtml(meta ? meta.name : state.myResultsTestId)}" yet.
@@ -855,6 +964,7 @@ function renderMyResults(){
   return `
     ${renderTopbar('inTest')}
     <div class="app wide">
+      ${renderMyOverallSummary()}
       ${selector}
       <div class="card score-hero">
         ${renderGauge(r.pct)}
@@ -862,6 +972,7 @@ function renderMyResults(){
           <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
           <h2 style="margin-top:10px;">${escapeHtml(meta ? meta.name : state.myResultsTestId)} — ${r.correctCount} / ${r.total}</h2>
           <p>Completed ${fmtDate(r.timestamp)}</p>
+          <button class="btn btn-ghost" style="margin-top:12px;" onclick="exportMyResultCSV()">⬇ Download my result (CSV)</button>
         </div>
       </div>
       ${renderBreakdown(r.sectionScores)}
@@ -907,9 +1018,76 @@ function renderAdminDetail(sub){
   `;
 }
 
+function renderAdminViewToggle(){
+  return `
+    <div class="test-tabs" style="margin-bottom:20px;">
+      <div class="test-tab ${state.adminView==='per-test'?'active':''}" onclick="switchAdminView('per-test')">Per Test</div>
+      <div class="test-tab ${state.adminView==='overall'?'active':''}" onclick="switchAdminView('overall')">Overall (All Users)</div>
+    </div>`;
+}
+
+function renderAdminOverall(){
+  if (state.adminOverallLoading){
+    return `${renderTopbar('admin')}<div class="app wide">${renderAdminViewToggle()}<div class="loading-inline"><div class="spinner"></div> Loading overall results…</div></div>`;
+  }
+
+  const subs = state.allSubmissions || [];
+  if (subs.length === 0){
+    return `${renderTopbar('admin')}<div class="app wide">
+      ${renderAdminViewToggle()}
+      <div class="empty-state card pad"><div class="big">📋</div>No submissions recorded yet across any assessment.</div>
+    </div>`;
+  }
+
+  const userRows = aggregateSubmissionsByUser(subs);
+
+  const totalUsers = userRows.length;
+  const overallAvg = Math.round(userRows.reduce((a,u)=>a+u.avgPct,0) / totalUsers);
+  const totalAttempts = subs.length;
+
+  const rows = userRows.map(u => `
+    <tr>
+      <td>${escapeHtml(u.email)}</td>
+      <td>${u.testsTaken}</td>
+      <td>${u.totalAttempts}</td>
+      <td><span class="score-pill ${u.avgPct>=PASS_PCT?'pass':'fail'}">${u.avgPct}%</span></td>
+      <td>${u.passCount}/${u.totalAttempts}</td>
+    </tr>`).join("");
+
+  return `
+    ${renderTopbar('admin')}
+    <div class="app wide">
+      ${renderAdminViewToggle()}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+        <div>
+          <h2 style="margin-bottom:4px;">Overall Team Performance — All Assessments</h2>
+          <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${totalUsers} team member${totalUsers!==1?'s':''} · ${totalAttempts} total submissions across ${state.adminCatalog.length} assessment${state.adminCatalog.length!==1?'s':''}</p>
+        </div>
+        <button class="btn btn-ghost" onclick="exportOverallCSV()">⬇ Download CSV</button>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="card kpi"><div class="n">${totalUsers}</div><div class="l">Team members with submissions</div></div>
+        <div class="card kpi"><div class="n">${overallAvg}%</div><div class="l">Average score (per user, across tests)</div></div>
+        <div class="card kpi"><div class="n">${totalAttempts}</div><div class="l">Total submissions</div></div>
+      </div>
+
+      <div class="card" style="overflow:hidden;">
+        <table class="admin-table">
+          <thead><tr><th>Email</th><th>Assessments Taken</th><th>Total Submissions</th><th>Avg Score</th><th>Passed</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
 function renderAdmin(){
   if (state.adminCatalog.length === 0){
     return `${renderTopbar('admin')}<div class="app wide"><div class="empty-state card pad">No assessments published yet.</div></div>`;
+  }
+
+  if (state.adminView === 'overall'){
+    return renderAdminOverall();
   }
 
   const selectOptions = state.adminCatalog.map(t =>
@@ -922,7 +1100,7 @@ function renderAdmin(){
     </div>`;
 
   if (state.adminLoading){
-    return `${renderTopbar('admin')}<div class="app wide">${selector}<div class="loading-inline"><div class="spinner"></div> Loading results…</div></div>`;
+    return `${renderTopbar('admin')}<div class="app wide">${renderAdminViewToggle()}${selector}<div class="loading-inline"><div class="spinner"></div> Loading results…</div></div>`;
   }
 
   if (state.selectedSubmissionIdx !== null){
@@ -935,6 +1113,7 @@ function renderAdmin(){
 
   if (subs.length === 0){
     return `${renderTopbar('admin')}<div class="app wide">
+      ${renderAdminViewToggle()}
       ${selector}
       <div class="empty-state card pad">
         <div class="big">📋</div>
@@ -978,9 +1157,15 @@ function renderAdmin(){
   return `
     ${renderTopbar('admin')}
     <div class="app wide">
+      ${renderAdminViewToggle()}
       ${selector}
-      <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.adminTestId)} — Team Performance</h2>
-      <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${subs.length} submission${subs.length!==1?'s':''} recorded</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+        <div>
+          <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.adminTestId)} — Team Performance</h2>
+          <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${subs.length} submission${subs.length!==1?'s':''} recorded</p>
+        </div>
+        <button class="btn btn-ghost" onclick="exportPerTestCSV()">⬇ Download CSV</button>
+      </div>
 
       <div class="kpi-grid">
         <div class="card kpi"><div class="n">${subs.length}</div><div class="l">Team members tested</div></div>
@@ -1007,6 +1192,7 @@ function render(){
   document.getElementById("root").innerHTML =
     state.view === "config-missing" ? renderConfigMissing() :
     state.view === "login" ? renderLogin() :
+    state.view === "restoring-session" ? renderRestoringSession() :
     state.view === "test-select" ? renderTestSelect() :
     state.view === "loading-test" ? renderLoadingTest() :
     state.view === "test" ? renderTest() :
@@ -1061,6 +1247,8 @@ async function handleGoogleCredential(response){
   }
 
   state.email = result.email;
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ email: state.email, ts: Date.now() })); } catch(e){}
+
   const [catalog, statuses, progress] = await Promise.all([
     fetchTestCatalog(),
     fetchStatusForEmail(state.email),
@@ -1076,6 +1264,7 @@ async function handleGoogleCredential(response){
 
 function logout(){
   try { if (typeof google !== 'undefined' && google.accounts) google.accounts.id.disableAutoSelect(); } catch(e) {}
+  try { localStorage.removeItem(SESSION_KEY); } catch(e){}
   state.email = "";
   state.testCatalog = [];
   state.testStatuses = {};
@@ -1101,6 +1290,7 @@ function exitToTestSelect(){
   state.currentIndex = 0;
   state.testId = null;
   state.timeExpired = false;
+  state.showLeaveWarning = false;
   render();
   refreshTestSelectData();
 }
@@ -1211,6 +1401,24 @@ function attemptSubmit(){
   submitTest();
 }
 
+// ---------- Leave-test warning (triggered by clicking Home mid-test) ----------
+function attemptLeaveTest(){
+  state.showLeaveWarning = true;
+  render();
+}
+function cancelLeaveWarning(){
+  state.showLeaveWarning = false;
+  render();
+}
+function confirmSubmitFromWarning(){
+  state.showLeaveWarning = false;
+  attemptSubmit();
+}
+function confirmLeaveWithoutSubmitting(){
+  state.showLeaveWarning = false;
+  exitToTestSelect();
+}
+
 async function submitTest(){
   stopTimer();
   const result = computeResult(state.answers);
@@ -1291,6 +1499,52 @@ function switchAdminTest(testId){
   loadAdminData();
 }
 
+async function switchAdminView(view){
+  state.adminView = view;
+  state.selectedSubmissionIdx = null;
+  if (view === 'overall'){
+    state.adminOverallLoading = true;
+    render();
+    state.allSubmissions = await loadAllSubmissionsForAdmin();
+    state.adminOverallLoading = false;
+  }
+  render();
+}
+
+// ---------- CSV exports ----------
+function exportPerTestCSV(){
+  const testMeta = state.adminCatalog.find(t => t.testId === state.adminTestId);
+  const testName = testMeta ? testMeta.name : state.adminTestId;
+  const headers = ["Email","Submitted","Score","Percent","Result"];
+  const rows = state.submissions
+    .slice()
+    .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .map(s => [s.name, fmtDate(s.timestamp), `${s.result.correctCount}/${s.result.total}`, s.result.pct + "%", s.result.pass ? "Passed" : "Needs review"]);
+  downloadCSV(safeFilename(testName) + "_results.csv", headers, rows);
+}
+
+function exportOverallCSV(){
+  const userRows = aggregateSubmissionsByUser(state.allSubmissions || []);
+  const headers = ["Email","Assessments Taken","Total Submissions","Avg Score","Passed"];
+  const rows = userRows.map(u => [u.email, u.testsTaken, u.totalAttempts, u.avgPct + "%", `${u.passCount}/${u.totalAttempts}`]);
+  downloadCSV("overall_team_performance.csv", headers, rows);
+}
+
+function exportMyResultCSV(){
+  const meta = state.testCatalog.find(t => t.testId === state.myResultsTestId);
+  const sub = state.testStatuses[state.myResultsTestId];
+  if (!sub) return;
+  const r = sub.result;
+  const headers = ["Question #","Module","Question","Your Answer","Correct Answer","Result"];
+  const rows = r.perQuestion.map(q => [
+    q.id, q.module, q.question,
+    q.chosenIndex !== undefined ? q.options[q.chosenIndex] : "(not answered)",
+    q.options[q.correctIndex],
+    q.isCorrect ? "Correct" : "Incorrect"
+  ]);
+  downloadCSV(safeFilename((meta ? meta.name : state.myResultsTestId) + "_" + state.email) + ".csv", headers, rows);
+}
+
 async function loadAdminData(){
   if (!state.adminTestId){ state.adminLoading = false; render(); return; }
   state.adminLoading = true;
@@ -1302,12 +1556,35 @@ async function loadAdminData(){
 }
 
 // ---------- Init ----------
-if (!backendConfigured()){
-  state.view = "config-missing";
-  render();
-} else {
-  render();
+async function initApp(){
+  if (!backendConfigured()){
+    state.view = "config-missing";
+    render();
+    return;
+  }
+
+  let session = null;
+  try { session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch(e){}
+
+  if (session && session.email){
+    state.email = session.email;
+    state.view = "restoring-session";
+    render();
+    const [catalog, statuses, progress] = await Promise.all([
+      fetchTestCatalog(),
+      fetchStatusForEmail(state.email),
+      fetchAllProgress()
+    ]);
+    state.testCatalog = catalog;
+    state.testStatuses = statuses;
+    state.progressMap = progress;
+    state.view = "test-select";
+    render();
+  } else {
+    render();
+  }
 }
+initApp();
 </script>
 </body>
 </html>
