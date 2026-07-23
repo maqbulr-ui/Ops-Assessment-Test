@@ -307,7 +307,7 @@
 
 // ---------- Config ----------
 const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzeVf_4QSXQZYR8oBw5uZphTDG6BaF3Pky0OQgbj8240rHbX3TK2WiPWxg98_xmaMhP/exec";
-const GOOGLE_CLIENT_ID = "690653029485-3rnbehrab4v2gqdhibqo6eqio6a5cnck.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "Google client id: 690653029485-3rnbehrab4v2gqdhibqo6eqio6a5cnck.apps.googleusercontent.com";
 const ALLOWED_EMAIL_DOMAIN = "meritto.com"; // hints Google's picker; the real enforcement happens server-side
 const PASS_PCT = 80;
 const ADMIN_CODE = "meritto2026";
@@ -569,7 +569,7 @@ function renderLogin(){
       <div class="card landing-card pad">
         <div class="eyebrow">Meritto Ops Enablement</div>
         <h1>Sign in to take an assessment</h1>
-        <p class="sub">Sign in with your Google account to see the assessments available to you and pick up any test you've started or completed before.</p>
+        <p class="sub">Sign in with your Google account to see every published assessment, and pick up any test you've started or completed before.</p>
         ${state.authChecking ? `<div class="loading-inline"><div class="spinner"></div> Verifying sign-in…</div>` : `<div class="gsi-btn-wrap" id="gsi-button-container"></div>`}
         ${state.authError ? `<div style="color:var(--red);font-size:13px;margin-top:12px;text-align:center;">${escapeHtml(state.authError)}</div>` : ''}
         <div class="gsi-fallback-note">You'll be identified by your Google account email.</div>
