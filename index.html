@@ -6,6 +6,7 @@
 <title>Ops Knowledge Check</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer onload="window.__gsiLoaded=true; if(window.__onGsiReady) window.__onGsiReady();"></script>
 <style>
   :root{
     --navy:#12233F;
@@ -289,6 +290,15 @@
     border-radius:50%;animation:spin .7s linear infinite;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
+
+  .gsi-btn-wrap{display:flex;justify-content:center;margin-top:8px;min-height:44px;}
+  .gsi-fallback-note{font-size:12.5px;color:var(--ink-mute);text-align:center;margin-top:10px;}
+
+  .timer-box{
+    font-family:'IBM Plex Mono';font-size:14px;font-weight:600;color:var(--navy);
+    padding:6px 12px;border-radius:8px;background:#EEF3F8;white-space:nowrap;
+  }
+  .timer-box.warn{background:var(--red-soft);color:var(--red);}
 </style>
 </head>
 <body>
@@ -297,26 +307,29 @@
 
 // ---------- Config ----------
 const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzeVf_4QSXQZYR8oBw5uZphTDG6BaF3Pky0OQgbj8240rHbX3TK2WiPWxg98_xmaMhP/exec";
+const GOOGLE_CLIENT_ID = "690653029485-3rnbehrab4v2gqdhibqo6eqio6a5cnck.apps.googleusercontent.com";
+const ALLOWED_EMAIL_DOMAIN = "meritto.com"; // hints Google's picker; the real enforcement happens server-side
 const PASS_PCT = 80;
 const ADMIN_CODE = "meritto2026";
 const LETTERS = ["A","B","C","D"];
 
 const state = {
-  view: "login",   // login | test-select | test | report | admin-gate | admin
+  view: "login",   // login | test-select | loading-test | test | report | admin-gate | admin
   email: "",
-  emailChecking: false,
-  testCatalog: [],        // [{testId, name, description, questionCount}]
+  authChecking: false,
+  authError: "",
+  testCatalog: [],
   testSearchQuery: "",
-  testStatuses: {},        // { [testId]: submissionEntry }
-  progressMap: {},          // { [testId]: progressEntry }
-  questionsCache: {},        // { [testId]: questions[] } — loaded on demand
-  loadingTest: false,
+  testStatuses: {},
+  progressMap: {},
+  questionsCache: {},
 
   testId: null,
   answers: {},
   currentIndex: 0,
   result: null,
   viewingPastResult: false,
+  timeExpired: false,
   reviewFilter: "all",
 
   adminUnlocked: false,
@@ -329,12 +342,18 @@ const state = {
   selectedSubmissionIdx: null,
 };
 
+// ---------- Timer (module-level, not part of render state) ----------
+let timerHandle = null;
+let testStartedAtMs = null;
+let testDurationSec = 0;
+
 // ---------- Helpers for the currently selected test ----------
 function currentQuestions(){ return state.questionsCache[state.testId] || []; }
 function currentSections(){ return [...new Set(currentQuestions().map(q => q.section))]; }
 function currentTotalQ(){ return currentQuestions().length; }
+function currentTestMeta(){ return state.testCatalog.find(t => t.testId === state.testId); }
 
-// ---------- Client identity (anonymous device id, paired with email) ----------
+// ---------- Client identity (device id — email now comes from verified Google login) ----------
 function getClientId(){
   let id;
   try { id = localStorage.getItem('ops_quiz_client_id'); } catch(e) { id = null; }
@@ -348,6 +367,9 @@ const CLIENT_ID = getClientId();
 
 function backendConfigured(){
   return BACKEND_URL && BACKEND_URL.indexOf('PASTE_YOUR') === -1;
+}
+function googleConfigured(){
+  return GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID.indexOf('PASTE_YOUR') === -1;
 }
 
 // ---------- Backend API ----------
@@ -365,36 +387,35 @@ async function apiPost(payload){
   return await res.json();
 }
 
-async function fetchTestCatalog(){
+async function verifyGoogleToken(idToken){
   try {
-    const data = await apiGet({ action: 'getTestCatalog' });
-    return data.tests || [];
-  } catch(e) { return []; }
+    return await apiPost({ action: 'verifyGoogleToken', idToken: idToken });
+  } catch(e) { return { valid: false, reason: 'network_error' }; }
+}
+async function fetchTestCatalog(){
+  try { const data = await apiGet({ action: 'getTestCatalog' }); return data.tests || []; }
+  catch(e) { return []; }
 }
 async function fetchQuestionsForTest(testId){
-  try {
-    const data = await apiGet({ action: 'getQuestions', testId: testId });
-    return data.questions || [];
-  } catch(e) { return []; }
+  try { const data = await apiGet({ action: 'getQuestions', testId: testId }); return data.questions || []; }
+  catch(e) { return []; }
 }
 async function fetchStatusForEmail(email){
-  try {
-    const data = await apiGet({ action: 'getStatusForEmail', email: email });
-    return data.statuses || {};
-  } catch(e) { return {}; }
+  try { const data = await apiGet({ action: 'getStatusForEmail', email: email }); return data.statuses || {}; }
+  catch(e) { return {}; }
 }
 async function fetchAllProgress(){
-  try {
-    const data = await apiGet({ action: 'getAllProgress', clientId: CLIENT_ID });
-    return data.progress || {};
-  } catch(e) { return {}; }
+  try { const data = await apiGet({ action: 'getAllProgress', clientId: CLIENT_ID }); return data.progress || {}; }
+  catch(e) { return {}; }
 }
 async function saveProgressRemote(){
   try {
-    await apiPost({
+    const res = await apiPost({
       action: 'saveProgress', clientId: CLIENT_ID, testId: state.testId,
-      name: state.email, answers: state.answers, currentIndex: state.currentIndex
+      name: state.email, answers: state.answers, currentIndex: state.currentIndex,
+      startedAt: testStartedAtMs ? new Date(testStartedAtMs).toISOString() : undefined
     });
+    if (res && res.startedAt) testStartedAtMs = new Date(res.startedAt).getTime();
   } catch(e) {}
 }
 async function clearProgressRemote(testId){
@@ -404,19 +425,50 @@ async function submitRemote(result){
   await apiPost({ action: 'submit', clientId: CLIENT_ID, testId: state.testId, name: state.email, result: result });
 }
 async function loadSubmissionsForAdmin(testId){
-  try {
-    const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE, testId: testId });
-    return data.submissions || [];
-  } catch(e) { return []; }
+  try { const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE, testId: testId }); return data.submissions || []; }
+  catch(e) { return []; }
 }
 
-// ---------- Ensure a test's questions are loaded before using them ----------
 async function ensureQuestionsLoaded(testId){
   if (!state.questionsCache[testId]){
     const qs = await fetchQuestionsForTest(testId);
     state.questionsCache[testId] = qs;
   }
   return state.questionsCache[testId];
+}
+
+// ---------- Timer ----------
+function startTimerFor(testId, startedAtIso){
+  stopTimer();
+  const meta = state.testCatalog.find(t => t.testId === testId);
+  testDurationSec = meta && meta.durationMinutes ? meta.durationMinutes * 60 : 0;
+  testStartedAtMs = startedAtIso ? new Date(startedAtIso).getTime() : Date.now();
+  if (testDurationSec <= 0) return; // no time limit configured
+  timerHandle = setInterval(updateTimerTick, 1000);
+  updateTimerTick();
+}
+function stopTimer(){
+  if (timerHandle){ clearInterval(timerHandle); timerHandle = null; }
+}
+function updateTimerTick(){
+  const el = document.getElementById('timer-display');
+  if (!el){ return; }
+  const elapsed = Math.floor((Date.now() - testStartedAtMs) / 1000);
+  const remaining = testDurationSec - elapsed;
+  if (remaining <= 0){
+    el.textContent = "0:00";
+    stopTimer();
+    forceSubmitOnTimeout();
+    return;
+  }
+  const m = Math.floor(remaining / 60);
+  const s = remaining % 60;
+  el.textContent = m + ":" + String(s).padStart(2,'0');
+  el.parentElement.classList.toggle('warn', remaining <= 120);
+}
+async function forceSubmitOnTimeout(){
+  state.timeExpired = true;
+  await submitTest();
 }
 
 // ---------- Scoring ----------
@@ -463,9 +515,6 @@ function scoreColor(pct){
   if (pct >= 60) return 'var(--amber)';
   return 'var(--red)';
 }
-function isValidEmail(str){
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str.trim());
-}
 
 // ---------- Shared ----------
 function renderTopbar(mode){
@@ -503,18 +552,27 @@ function renderConfigMissing(){
 
 // ---------- Login ----------
 function renderLogin(){
+  if (!googleConfigured()){
+    return `
+      ${renderTopbar('login')}
+      <div class="landing-wrap">
+        <div class="card landing-card pad">
+          <div class="eyebrow" style="color:var(--red);">Setup needed</div>
+          <h1 style="font-size:20px;">Google Sign-In not configured</h1>
+          <p class="sub">Paste your Google OAuth Client ID into the <code>GOOGLE_CLIENT_ID</code> constant near the top of the script, save, and re-host this file.</p>
+        </div>
+      </div>`;
+  }
   return `
     ${renderTopbar('login')}
     <div class="landing-wrap">
       <div class="card landing-card pad">
         <div class="eyebrow">Meritto Ops Enablement</div>
         <h1>Sign in to take an assessment</h1>
-        <p class="sub">Enter your work email to see the assessments available to you and pick up any test you've started or completed before.</p>
-        <div class="field">
-          <label>Your work email address</label>
-          <input type="email" placeholder="e.g. priya.sharma@meritto.com" value="${escapeHtml(state.email)}" oninput="state.email=this.value" onkeydown="if(event.key==='Enter')login()"/>
-        </div>
-        <button class="btn btn-primary" ${state.emailChecking ? 'disabled style="opacity:.6;"' : ''} onclick="login()">${state.emailChecking ? 'Checking…' : 'Continue →'}</button>
+        <p class="sub">Sign in with your Google account to see the assessments available to you and pick up any test you've started or completed before.</p>
+        ${state.authChecking ? `<div class="loading-inline"><div class="spinner"></div> Verifying sign-in…</div>` : `<div class="gsi-btn-wrap" id="gsi-button-container"></div>`}
+        ${state.authError ? `<div style="color:var(--red);font-size:13px;margin-top:12px;text-align:center;">${escapeHtml(state.authError)}</div>` : ''}
+        <div class="gsi-fallback-note">You'll be identified by your Google account email.</div>
       </div>
     </div>`;
 }
@@ -552,7 +610,7 @@ function renderTestSelect(){
         <button class="btn btn-primary" onclick="resumeTest('${testId}')">Resume</button>
         <button class="btn btn-ghost" onclick="retakeTest('${testId}')">Start over</button>`;
     } else {
-      pill = `<span class="status-pill not-started">Not started · ${total} questions</span>`;
+      pill = `<span class="status-pill not-started">Not started · ${total} questions${test.durationMinutes ? ' · ' + test.durationMinutes + ' min' : ''}</span>`;
       actions = `<button class="btn btn-primary" onclick="beginTest('${testId}')">Start test</button>`;
     }
 
@@ -629,6 +687,9 @@ function renderTest(){
       </div>`;
   });
 
+  const meta = currentTestMeta();
+  const hasTimer = meta && meta.durationMinutes > 0;
+
   return `
     ${renderTopbar('inTest')}
     <div class="app">
@@ -637,6 +698,7 @@ function renderTest(){
           <div class="qcounter">Question <b>${state.currentIndex+1}</b> of ${totalQ}</div>
           <div class="progress-bar"><div class="fill" style="width:${Math.round((answeredCount/totalQ)*100)}%"></div></div>
           <div class="progress-count">${answeredCount} / ${totalQ} answered</div>
+          ${hasTimer ? `<div class="timer-box"><span id="timer-display">--:--</span></div>` : ''}
         </div>
       </div>
 
@@ -727,6 +789,10 @@ function renderReport(){
       ${state.viewingPastResult ? `
         <div class="card pad" style="margin-bottom:16px;border-color:var(--navy-2);background:#EEF3F8;">
           <b>Viewing a previous submission</b> — ${escapeHtml(testName)}, from ${fmtDate(r.timestamp)}.
+        </div>` : ''}
+      ${state.timeExpired && !state.viewingPastResult ? `
+        <div class="card pad" style="margin-bottom:16px;border-color:var(--red);background:var(--red-soft);">
+          <b>Time's up</b> — this test auto-submitted because the time limit was reached. Answers you'd made before then are scored below.
         </div>` : ''}
       <div class="card score-hero">
         ${renderGauge(r.pct)}
@@ -894,31 +960,67 @@ function render(){
     state.view === "report" ? renderReport() :
     state.view === "admin-gate" ? renderAdminGate() :
     state.view === "admin" ? renderAdmin() : "";
+
+  // Post-render hooks that need real DOM nodes to exist
+  if (state.view === "login" && !state.authChecking && googleConfigured()){
+    renderGoogleButton();
+  }
+  if (state.view === "test"){
+    updateTimerTick();
+  }
 }
 
-// ---------- Login / test selection ----------
-async function login(){
-  const email = state.email.trim().toLowerCase();
-  if (!email){ alert("Please enter your work email address."); return; }
-  if (!isValidEmail(email)){ alert("Please enter a valid email address (e.g. name@company.com)."); return; }
-  state.email = email;
-  state.emailChecking = true;
+// ---------- Google Sign-In ----------
+window.__onGsiReady = function(){
+  if (!googleConfigured()) return;
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+    auto_select: false,
+    hd: ALLOWED_EMAIL_DOMAIN || undefined
+  });
+  if (state.view === "login") renderGoogleButton();
+};
+if (window.__gsiLoaded) { window.__onGsiReady(); }
+
+function renderGoogleButton(){
+  const el = document.getElementById('gsi-button-container');
+  if (!el || typeof google === 'undefined' || !google.accounts) return;
+  el.innerHTML = "";
+  google.accounts.id.renderButton(el, { theme: 'outline', size: 'large', width: 320 });
+}
+
+async function handleGoogleCredential(response){
+  state.authChecking = true;
+  state.authError = "";
   render();
 
+  const result = await verifyGoogleToken(response.credential);
+  if (!result.valid){
+    state.authChecking = false;
+    state.authError = result.reason === "domain_not_allowed"
+      ? "Please sign in with your @meritto.com Google account."
+      : "Could not verify your Google sign-in. Please try again.";
+    render();
+    return;
+  }
+
+  state.email = result.email;
   const [catalog, statuses, progress] = await Promise.all([
     fetchTestCatalog(),
-    fetchStatusForEmail(email),
+    fetchStatusForEmail(state.email),
     fetchAllProgress()
   ]);
   state.testCatalog = catalog;
   state.testStatuses = statuses;
   state.progressMap = progress;
-  state.emailChecking = false;
+  state.authChecking = false;
   state.view = "test-select";
   render();
 }
 
 function logout(){
+  try { if (typeof google !== 'undefined' && google.accounts) google.accounts.id.disableAutoSelect(); } catch(e) {}
   state.email = "";
   state.testCatalog = [];
   state.testStatuses = {};
@@ -926,6 +1028,7 @@ function logout(){
   state.questionsCache = {};
   state.testId = null;
   state.testSearchQuery = "";
+  state.authError = "";
   state.view = "login";
   render();
 }
@@ -936,11 +1039,13 @@ function setTestSearch(val){
 }
 
 function exitToTestSelect(){
+  stopTimer();
   state.view = "test-select";
   state.answers = {};
   state.result = null;
   state.currentIndex = 0;
   state.testId = null;
+  state.timeExpired = false;
   render();
   refreshTestSelectData();
 }
@@ -965,9 +1070,11 @@ async function beginTest(testId){
   state.answers = {};
   state.currentIndex = 0;
   state.viewingPastResult = false;
+  state.timeExpired = false;
   state.view = "test";
   render();
   window.scrollTo(0,0);
+  startTimerFor(testId, null);
   saveProgressRemote();
 }
 
@@ -980,9 +1087,11 @@ async function resumeTest(testId){
   state.answers = (prog && prog.answers) || {};
   state.currentIndex = Math.min((prog && prog.currentIndex) || 0, currentTotalQ() - 1);
   state.viewingPastResult = false;
+  state.timeExpired = false;
   state.view = "test";
   render();
   window.scrollTo(0,0);
+  startTimerFor(testId, prog && prog.startedAt ? prog.startedAt : null);
 }
 
 async function retakeTest(testId){
@@ -992,6 +1101,7 @@ async function retakeTest(testId){
 }
 
 function viewPastResult(testId){
+  stopTimer();
   const sub = state.testStatuses[testId];
   state.testId = testId;
   state.result = sub.result;
@@ -1047,6 +1157,7 @@ function attemptSubmit(){
 }
 
 async function submitTest(){
+  stopTimer();
   const result = computeResult(state.answers);
   state.result = result;
   state.viewingPastResult = false;
