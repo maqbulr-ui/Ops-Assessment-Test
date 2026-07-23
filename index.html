@@ -325,6 +325,7 @@ const state = {
   questionsCache: {},
 
   testId: null,
+  myResultsTestId: null,
   answers: {},
   currentIndex: 0,
   result: null,
@@ -530,9 +531,12 @@ function renderTopbar(mode){
         ${escapeHtml(state.email)}
         <span class="logout" onclick="logout()">Log out</span>
       </div>
+      <button class="link-btn" onclick="goMyResults()">My Results</button>
       <button class="link-btn" onclick="goAdmin()">Team Report</button>`;
   } else if (mode === 'inTest'){
     right = `<button class="link-btn" onclick="exitToTestSelect()">← Tests</button>`;
+  } else if (mode === 'admin'){
+    right = `<button class="link-btn" onclick="goHomeFromAdmin()">Home</button>`;
   }
   return `
     <div class="topbar">
@@ -820,10 +824,56 @@ function renderReport(){
     </div>`;
 }
 
+// ---------- My Results (personal, dropdown-based like the admin view) ----------
+function renderMyResults(){
+  if (state.testCatalog.length === 0){
+    return `${renderTopbar('inTest')}<div class="app wide"><div class="empty-state card pad">No assessments published yet.</div></div>`;
+  }
+
+  const selectOptions = state.testCatalog.map(t =>
+    `<option value="${escapeHtml(t.testId)}" ${state.myResultsTestId===t.testId?'selected':''}>${escapeHtml(t.name)}</option>`
+  ).join("");
+  const selector = `
+    <div class="admin-select-wrap">
+      <select onchange="switchMyResultsTest(this.value)">${selectOptions}</select>
+    </div>`;
+
+  const meta = state.testCatalog.find(t => t.testId === state.myResultsTestId);
+  const sub = state.testStatuses[state.myResultsTestId];
+
+  if (!sub){
+    return `${renderTopbar('inTest')}<div class="app wide">
+      ${selector}
+      <div class="empty-state card pad">
+        You haven't completed "${escapeHtml(meta ? meta.name : state.myResultsTestId)}" yet.
+        <div style="margin-top:16px;"><button class="btn btn-primary" onclick="beginTest('${state.myResultsTestId}')">Start test</button></div>
+      </div>
+    </div>`;
+  }
+
+  const r = sub.result;
+  return `
+    ${renderTopbar('inTest')}
+    <div class="app wide">
+      ${selector}
+      <div class="card score-hero">
+        ${renderGauge(r.pct)}
+        <div class="score-side">
+          <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
+          <h2 style="margin-top:10px;">${escapeHtml(meta ? meta.name : state.myResultsTestId)} — ${r.correctCount} / ${r.total}</h2>
+          <p>Completed ${fmtDate(r.timestamp)}</p>
+        </div>
+      </div>
+      ${renderBreakdown(r.sectionScores)}
+      <div class="section-title-row"><h3>Answer review</h3></div>
+      <div style="margin-top:14px;">${renderReviewList(r.perQuestion, 'all')}</div>
+    </div>`;
+}
+
 // ---------- Admin ----------
 function renderAdminGate(){
   return `
-    ${renderTopbar('login')}
+    ${renderTopbar('admin')}
     <div class="gate-wrap">
       <div class="card landing-card pad">
         <div class="eyebrow">Manager Access</div>
@@ -859,7 +909,7 @@ function renderAdminDetail(sub){
 
 function renderAdmin(){
   if (state.adminCatalog.length === 0){
-    return `${renderTopbar('login')}<div class="app wide"><div class="empty-state card pad">No assessments published yet.</div></div>`;
+    return `${renderTopbar('admin')}<div class="app wide"><div class="empty-state card pad">No assessments published yet.</div></div>`;
   }
 
   const selectOptions = state.adminCatalog.map(t =>
@@ -872,19 +922,19 @@ function renderAdmin(){
     </div>`;
 
   if (state.adminLoading){
-    return `${renderTopbar('login')}<div class="app wide">${selector}<div class="loading-inline"><div class="spinner"></div> Loading results…</div></div>`;
+    return `${renderTopbar('admin')}<div class="app wide">${selector}<div class="loading-inline"><div class="spinner"></div> Loading results…</div></div>`;
   }
 
   if (state.selectedSubmissionIdx !== null){
     const sub = state.submissions[state.selectedSubmissionIdx];
-    return `${renderTopbar('login')}<div class="app wide">${renderAdminDetail(sub)}</div>`;
+    return `${renderTopbar('admin')}<div class="app wide">${renderAdminDetail(sub)}</div>`;
   }
 
   const subs = state.submissions;
   const testMeta = state.adminCatalog.find(t => t.testId === state.adminTestId);
 
   if (subs.length === 0){
-    return `${renderTopbar('login')}<div class="app wide">
+    return `${renderTopbar('admin')}<div class="app wide">
       ${selector}
       <div class="empty-state card pad">
         <div class="big">📋</div>
@@ -926,7 +976,7 @@ function renderAdmin(){
     </div>`).join("");
 
   return `
-    ${renderTopbar('login')}
+    ${renderTopbar('admin')}
     <div class="app wide">
       ${selector}
       <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.adminTestId)} — Team Performance</h2>
@@ -962,7 +1012,8 @@ function render(){
     state.view === "test" ? renderTest() :
     state.view === "report" ? renderReport() :
     state.view === "admin-gate" ? renderAdminGate() :
-    state.view === "admin" ? renderAdmin() : "";
+    state.view === "admin" ? renderAdmin() :
+    state.view === "my-results" ? renderMyResults() : "";
 
   // Post-render hooks that need real DOM nodes to exist
   if (state.view === "login" && !state.authChecking && googleConfigured()){
@@ -1180,6 +1231,32 @@ function setReviewFilter(f){
 }
 
 // ---------- Admin ----------
+// ---------- My Results ----------
+function goMyResults(){
+  state.view = "my-results";
+  if (!state.myResultsTestId && state.testCatalog.length){
+    state.myResultsTestId = state.testCatalog[0].testId;
+  }
+  render();
+}
+
+function switchMyResultsTest(testId){
+  state.myResultsTestId = testId;
+  render();
+}
+
+// ---------- Admin ----------
+function goHomeFromAdmin(){
+  if (state.email){
+    state.view = "test-select";
+    render();
+    refreshTestSelectData();
+  } else {
+    state.view = "login";
+    render();
+  }
+}
+
 async function goAdmin(){
   state.view = state.adminUnlocked ? "admin" : "admin-gate";
   state.selectedSubmissionIdx = null;
