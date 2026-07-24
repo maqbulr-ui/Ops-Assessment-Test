@@ -279,7 +279,7 @@
     font-size:14px;font-family:'Inter';background:#fff;
   }
   .search-field input:focus{outline:none;border-color:var(--navy-2);}
-  .admin-select-wrap{margin-bottom:18px;}
+  .admin-select-wrap{margin-bottom:0;}
   .admin-select-wrap select{
     padding:10px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;
     font-family:'Inter';font-weight:600;background:#fff;color:var(--navy);min-width:260px;
@@ -306,7 +306,8 @@
   }
   .modal-card{max-width:420px;width:100%;}
 
-  .member-filter-wrap{position:relative;display:inline-block;margin-bottom:18px;}
+  .member-filter-wrap{position:relative;display:inline-block;}
+  .admin-controls-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
   .member-filter-panel{
     position:absolute;top:calc(100% + 6px);left:0;z-index:60;width:300px;
     padding:14px;box-shadow:0 8px 28px rgba(18,35,63,0.18);
@@ -1062,6 +1063,7 @@ function renderMemberFilter(availableEmails){
             <span class="link-btn" style="color:var(--navy-2);" onclick="clearMemberFilter()">Clear</span>
           </div>
           <div class="mf-list">${options || '<div class="mf-empty">No submissions yet.</div>'}</div>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px;padding:9px;" onclick="closeMemberFilterPanel()">OK</button>
         </div>` : ''}
     </div>`;
 }
@@ -1179,8 +1181,10 @@ function renderAdmin(){
   if (filteredSubs.length === 0){
     return `${renderTopbar('admin')}<div class="app wide">
       ${renderAdminViewToggle()}
-      ${selector}
-      ${renderMemberFilter(allEmails)}
+      <div class="admin-controls-row">
+        ${selector}
+        ${renderMemberFilter(allEmails)}
+      </div>
       <div class="empty-state card pad">No submissions match the selected member filter.</div>
     </div>`;
   }
@@ -1221,8 +1225,10 @@ function renderAdmin(){
     ${renderTopbar('admin')}
     <div class="app wide">
       ${renderAdminViewToggle()}
-      ${selector}
-      ${renderMemberFilter(allEmails)}
+      <div class="admin-controls-row">
+        ${selector}
+        ${renderMemberFilter(allEmails)}
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
         <div>
           <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.adminTestId)} — Team Performance</h2>
@@ -1589,8 +1595,13 @@ function toggleMemberFilter(email){
   else state.memberFilter.splice(idx, 1);
   render();
 }
+function closeMemberFilterPanel(){
+  state.memberFilterOpen = false;
+  render();
+}
 function clearMemberFilter(){
   state.memberFilter = [];
+  state.memberFilterOpen = false;
   render();
 }
 
