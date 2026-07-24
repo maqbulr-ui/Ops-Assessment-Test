@@ -305,6 +305,19 @@
     display:flex;align-items:center;justify-content:center;padding:20px;
   }
   .modal-card{max-width:420px;width:100%;}
+
+  .member-filter-wrap{position:relative;display:inline-block;margin-bottom:18px;}
+  .member-filter-panel{
+    position:absolute;top:calc(100% + 6px);left:0;z-index:60;width:300px;
+    padding:14px;box-shadow:0 8px 28px rgba(18,35,63,0.18);
+  }
+  .mf-header{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .mf-header .link-btn{text-transform:none;font-weight:600;font-size:12.5px;}
+  .mf-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
+  .mf-option{display:flex;align-items:center;gap:9px;font-size:13.5px;padding:7px 6px;border-radius:6px;cursor:pointer;}
+  .mf-option:hover{background:#F5F6F8;}
+  .mf-option input{cursor:pointer;}
+  .mf-empty{font-size:13px;color:var(--ink-mute);padding:8px 6px;}
 </style>
 </head>
 <body>
@@ -350,6 +363,8 @@ const state = {
   allSubmissions: [],
   allSubmissionsLoaded: false,
   adminOverallLoading: false,
+  memberFilter: [],
+  memberFilterOpen: false,
   submissions: [],
   adminLoading: true,
   selectedSubmissionIdx: null,
@@ -1026,6 +1041,31 @@ function renderAdminViewToggle(){
     </div>`;
 }
 
+function renderMemberFilter(availableEmails){
+  const selectedCount = state.memberFilter.length;
+  const label = selectedCount === 0 ? "Filter by member" : `${selectedCount} member${selectedCount!==1?'s':''} selected`;
+  const options = availableEmails.map(email => {
+    const checked = state.memberFilter.includes(email);
+    return `
+      <label class="mf-option">
+        <input type="checkbox" ${checked?'checked':''} onchange="toggleMemberFilter('${email.replace(/'/g,"\\'")}')"/>
+        <span>${escapeHtml(email)}</span>
+      </label>`;
+  }).join("");
+  return `
+    <div class="member-filter-wrap">
+      <button class="btn btn-ghost" onclick="toggleMemberFilterPanel(event)">👥 ${label} ▾</button>
+      ${state.memberFilterOpen ? `
+        <div class="member-filter-panel card">
+          <div class="mf-header">
+            <span>Filter by team member</span>
+            <span class="link-btn" style="color:var(--navy-2);" onclick="clearMemberFilter()">Clear</span>
+          </div>
+          <div class="mf-list">${options || '<div class="mf-empty">No submissions yet.</div>'}</div>
+        </div>` : ''}
+    </div>`;
+}
+
 function renderAdminOverall(){
   if (state.adminOverallLoading){
     return `${renderTopbar('admin')}<div class="app wide">${renderAdminViewToggle()}<div class="loading-inline"><div class="spinner"></div> Loading overall results…</div></div>`;
@@ -1039,11 +1079,22 @@ function renderAdminOverall(){
     </div>`;
   }
 
-  const userRows = aggregateSubmissionsByUser(subs);
+  const allEmails = [...new Set(subs.map(s => s.name))].sort();
+  const filteredSubs = state.memberFilter.length ? subs.filter(s => state.memberFilter.includes(s.name)) : subs;
+
+  if (filteredSubs.length === 0){
+    return `${renderTopbar('admin')}<div class="app wide">
+      ${renderAdminViewToggle()}
+      ${renderMemberFilter(allEmails)}
+      <div class="empty-state card pad">No submissions match the selected member filter.</div>
+    </div>`;
+  }
+
+  const userRows = aggregateSubmissionsByUser(filteredSubs);
 
   const totalUsers = userRows.length;
-  const overallAvg = Math.round(userRows.reduce((a,u)=>a+u.avgPct,0) / totalUsers);
-  const totalAttempts = subs.length;
+  const overallAvg = totalUsers ? Math.round(userRows.reduce((a,u)=>a+u.avgPct,0) / totalUsers) : 0;
+  const totalAttempts = filteredSubs.length;
 
   const rows = userRows.map(u => `
     <tr>
@@ -1058,6 +1109,7 @@ function renderAdminOverall(){
     ${renderTopbar('admin')}
     <div class="app wide">
       ${renderAdminViewToggle()}
+      ${renderMemberFilter(allEmails)}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
         <div>
           <h2 style="margin-bottom:4px;">Overall Team Performance — All Assessments</h2>
@@ -1110,6 +1162,8 @@ function renderAdmin(){
 
   const subs = state.submissions;
   const testMeta = state.adminCatalog.find(t => t.testId === state.adminTestId);
+  const allEmails = [...new Set(subs.map(s => s.name))].sort();
+  const filteredSubs = state.memberFilter.length ? subs.filter(s => state.memberFilter.includes(s.name)) : subs;
 
   if (subs.length === 0){
     return `${renderTopbar('admin')}<div class="app wide">
@@ -1122,12 +1176,21 @@ function renderAdmin(){
     </div>`;
   }
 
-  const avgPct = Math.round(subs.reduce((a,s)=>a+s.result.pct,0)/subs.length);
-  const passCount = subs.filter(s=>s.result.pass).length;
-  const passRate = Math.round((passCount/subs.length)*100);
+  if (filteredSubs.length === 0){
+    return `${renderTopbar('admin')}<div class="app wide">
+      ${renderAdminViewToggle()}
+      ${selector}
+      ${renderMemberFilter(allEmails)}
+      <div class="empty-state card pad">No submissions match the selected member filter.</div>
+    </div>`;
+  }
+
+  const avgPct = Math.round(filteredSubs.reduce((a,s)=>a+s.result.pct,0)/filteredSubs.length);
+  const passCount = filteredSubs.filter(s=>s.result.pass).length;
+  const passRate = Math.round((passCount/filteredSubs.length)*100);
 
   const secAgg = {};
-  subs.forEach(s => s.result.sectionScores.forEach(ss => {
+  filteredSubs.forEach(s => s.result.sectionScores.forEach(ss => {
     if (!secAgg[ss.section]) secAgg[ss.section] = {correct:0,total:0};
     secAgg[ss.section].correct += ss.correct;
     secAgg[ss.section].total += ss.total;
@@ -1136,7 +1199,7 @@ function renderAdmin(){
     section: s, pct: Math.round((secAgg[s].correct/secAgg[s].total)*100)
   })).sort((a,b)=>a.pct-b.pct);
 
-  const rows = subs.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map((s) => {
+  const rows = filteredSubs.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map((s) => {
     const realIdx = subs.indexOf(s);
     return `
       <tr class="clickable" onclick="state.selectedSubmissionIdx=${realIdx}; render()">
@@ -1159,19 +1222,20 @@ function renderAdmin(){
     <div class="app wide">
       ${renderAdminViewToggle()}
       ${selector}
+      ${renderMemberFilter(allEmails)}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
         <div>
           <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.adminTestId)} — Team Performance</h2>
-          <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${subs.length} submission${subs.length!==1?'s':''} recorded</p>
+          <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${filteredSubs.length} submission${filteredSubs.length!==1?'s':''} recorded${state.memberFilter.length ? ' (filtered)' : ''}</p>
         </div>
         <button class="btn btn-ghost" onclick="exportPerTestCSV()">⬇ Download CSV</button>
       </div>
 
       <div class="kpi-grid">
-        <div class="card kpi"><div class="n">${subs.length}</div><div class="l">Team members tested</div></div>
+        <div class="card kpi"><div class="n">${filteredSubs.length}</div><div class="l">Team members tested</div></div>
         <div class="card kpi"><div class="n">${avgPct}%</div><div class="l">Average score</div></div>
         <div class="card kpi"><div class="n">${passRate}%</div><div class="l">Pass rate (≥${PASS_PCT}%)</div></div>
-        <div class="card kpi"><div class="n">${passCount}/${subs.length}</div><div class="l">Passed the assessment</div></div>
+        <div class="card kpi"><div class="n">${passCount}/${filteredSubs.length}</div><div class="l">Passed the assessment</div></div>
       </div>
 
       <div class="card pad" style="margin-bottom:24px;">
@@ -1496,12 +1560,15 @@ async function checkAdminCode(){
 function switchAdminTest(testId){
   state.adminTestId = testId;
   state.selectedSubmissionIdx = null;
+  state.memberFilter = [];
+  state.memberFilterOpen = false;
   loadAdminData();
 }
 
 async function switchAdminView(view){
   state.adminView = view;
   state.selectedSubmissionIdx = null;
+  state.memberFilterOpen = false;
   if (view === 'overall'){
     state.adminOverallLoading = true;
     render();
@@ -1511,12 +1578,32 @@ async function switchAdminView(view){
   render();
 }
 
+function toggleMemberFilterPanel(evt){
+  if (evt) evt.stopPropagation();
+  state.memberFilterOpen = !state.memberFilterOpen;
+  render();
+}
+function toggleMemberFilter(email){
+  const idx = state.memberFilter.indexOf(email);
+  if (idx === -1) state.memberFilter.push(email);
+  else state.memberFilter.splice(idx, 1);
+  render();
+}
+function clearMemberFilter(){
+  state.memberFilter = [];
+  render();
+}
+
 // ---------- CSV exports ----------
+function applyMemberFilter(subs){
+  return state.memberFilter.length ? subs.filter(s => state.memberFilter.includes(s.name)) : subs;
+}
+
 function exportPerTestCSV(){
   const testMeta = state.adminCatalog.find(t => t.testId === state.adminTestId);
   const testName = testMeta ? testMeta.name : state.adminTestId;
   const headers = ["Email","Submitted","Score","Percent","Result"];
-  const rows = state.submissions
+  const rows = applyMemberFilter(state.submissions)
     .slice()
     .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))
     .map(s => [s.name, fmtDate(s.timestamp), `${s.result.correctCount}/${s.result.total}`, s.result.pct + "%", s.result.pass ? "Passed" : "Needs review"]);
@@ -1524,7 +1611,7 @@ function exportPerTestCSV(){
 }
 
 function exportOverallCSV(){
-  const userRows = aggregateSubmissionsByUser(state.allSubmissions || []);
+  const userRows = aggregateSubmissionsByUser(applyMemberFilter(state.allSubmissions || []));
   const headers = ["Email","Assessments Taken","Total Submissions","Avg Score","Passed"];
   const rows = userRows.map(u => [u.email, u.testsTaken, u.totalAttempts, u.avgPct + "%", `${u.passCount}/${u.totalAttempts}`]);
   downloadCSV("overall_team_performance.csv", headers, rows);
