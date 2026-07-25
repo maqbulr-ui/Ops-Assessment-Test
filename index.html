@@ -226,6 +226,17 @@
   .qcard-single .qtext{font-size:17px;line-height:1.6;font-weight:500;}
   .qcard-single .qmodule{font-size:12px;color:var(--ink-mute);margin:8px 0 22px 50px;font-style:italic;}
   .qcard-single .options{margin-left:50px;gap:10px;}
+
+  .subjective-wrap{margin-left:50px;}
+  .subjective-marks-tag{
+    font-family:'IBM Plex Mono';font-size:11.5px;color:var(--amber);font-weight:600;
+    text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;
+  }
+  .subj-textarea{
+    width:100%;min-height:160px;padding:14px 16px;border:1.5px solid var(--line);border-radius:9px;
+    font-family:'Inter';font-size:14.5px;line-height:1.6;resize:vertical;background:#FBFBFD;
+  }
+  .subj-textarea:focus{outline:none;border-color:var(--navy-2);background:#fff;}
   .qcard-single .opt{padding:14px 16px;font-size:14.5px;}
   .nav-bar{
     display:flex;align-items:center;justify-content:space-between;gap:16px;
@@ -268,6 +279,7 @@
     .bd-row .label{width:140px;font-size:12px;}
     .qcard-single{padding:20px;}
     .qcard-single .qmodule,.qcard-single .options{margin-left:0;}
+    .subjective-wrap{margin-left:0;}
     .nav-bar{flex-direction:column;}
     .nav-bar .note{order:3;}
     .nav-dot{width:26px;height:26px;font-size:11px;}
@@ -313,6 +325,8 @@
     padding:14px;box-shadow:0 8px 28px rgba(18,35,63,0.18);
   }
   .mf-header{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .mf-search{width:100%;padding:8px 11px;border:1.5px solid var(--line);border-radius:7px;font-size:13px;font-family:'Inter';margin-bottom:8px;}
+  .mf-search:focus{outline:none;border-color:var(--navy-2);}
   .mf-header .link-btn{text-transform:none;font-weight:600;font-size:12.5px;}
   .mf-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;}
   .mf-option{display:flex;align-items:center;gap:9px;font-size:13.5px;padding:7px 6px;border-radius:6px;cursor:pointer;}
@@ -326,8 +340,8 @@
 <script>
 
 // ---------- Config ----------
-const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzeVf_4QSXQZYR8oBw5uZphTDG6BaF3Pky0OQgbj8240rHbX3TK2WiPWxg98_xmaMhP/exec";
-const GOOGLE_CLIENT_ID = "690653029485-3rnbehrab4v2gqdhibqo6eqio6a5cnck.apps.googleusercontent.com";
+const BACKEND_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+const GOOGLE_CLIENT_ID = "PASTE_YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE";
 const ALLOWED_EMAIL_DOMAIN = "meritto.com"; // hints Google's picker; the real enforcement happens server-side
 const PASS_PCT = 80;
 const ADMIN_CODE = "meritto2026";
@@ -359,6 +373,8 @@ const state = {
   adminCodeInput: "",
   adminError: false,
   adminCatalog: [],
+  pendingViewAfterUnlock: "admin",
+  adminCatalogLoading: false,
   adminTestId: null,
   adminView: "per-test",       // "per-test" | "overall"
   allSubmissions: [],
@@ -366,6 +382,18 @@ const state = {
   adminOverallLoading: false,
   memberFilter: [],
   memberFilterOpen: false,
+  memberFilterSearch: "",
+
+  // Evaluator workflow
+  evaluatorCatalog: [],
+  evaluatorCatalogLoading: false,
+  evaluatorTestId: null,
+  evaluatorSubmissions: [],
+  evaluatorLoading: false,
+  evaluatorSelectedIdx: null,
+  evalMarksDraft: {},
+  evalFeedbackDraft: {},
+  evaluatorSaving: false,
   submissions: [],
   adminLoading: true,
   selectedSubmissionIdx: null,
@@ -450,8 +478,8 @@ async function saveProgressRemote(){
 async function clearProgressRemote(testId){
   try { await apiPost({ action: 'clearProgress', clientId: CLIENT_ID, testId: testId }); } catch(e) {}
 }
-async function submitRemote(result){
-  await apiPost({ action: 'submit', clientId: CLIENT_ID, testId: state.testId, name: state.email, result: result });
+async function submitRemote(result, submissionId){
+  await apiPost({ action: 'submit', clientId: CLIENT_ID, testId: state.testId, name: state.email, result: result, submissionId: submissionId });
 }
 async function loadSubmissionsForAdmin(testId){
   try { const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE, testId: testId }); return data.submissions || []; }
@@ -460,6 +488,18 @@ async function loadSubmissionsForAdmin(testId){
 async function loadAllSubmissionsForAdmin(){
   try { const data = await apiGet({ action: 'getSubmissions', code: ADMIN_CODE }); return data.submissions || []; }
   catch(e) { return []; }
+}
+
+function generateSubmissionId(){
+  try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch(e){}
+  return 'sub_' + Date.now() + '_' + Math.random().toString(36).slice(2,10);
+}
+
+async function saveEvaluationRemote(testId, submissionId, marks, feedback){
+  return await apiPost({
+    action: 'saveEvaluation', code: ADMIN_CODE, testId: testId, submissionId: submissionId,
+    marks: marks, feedback: feedback, evaluatorEmail: state.email || 'evaluator'
+  });
 }
 
 async function ensureQuestionsLoaded(testId){
@@ -508,15 +548,26 @@ async function forceSubmitOnTimeout(){
 }
 
 // ---------- Scoring ----------
+function isQuestionAnswered(q){
+  const a = state.answers[q.id];
+  if (q.type === 'subjective'){
+    return !!(a && typeof a === 'object' && a.text && a.text.trim().length > 0);
+  }
+  return typeof a === 'number';
+}
+
 function computeResult(answers){
-  const questions = currentQuestions();
-  const sections = currentSections();
+  const allQuestions = currentQuestions();
+  const mcqQuestions = allQuestions.filter(q => q.type !== 'subjective');
+  const subjQuestions = allQuestions.filter(q => q.type === 'subjective');
+
+  const mcqSections = [...new Set(mcqQuestions.map(q => q.section))];
   let correctCount = 0;
   const perQuestion = [];
   const sectionMap = {};
-  sections.forEach(s => sectionMap[s] = {correct:0, total:0});
+  mcqSections.forEach(s => sectionMap[s] = {correct:0, total:0});
 
-  questions.forEach(q => {
+  mcqQuestions.forEach(q => {
     const chosen = answers[q.id];
     const isCorrect = chosen === q.correct;
     if (isCorrect) correctCount++;
@@ -528,13 +579,33 @@ function computeResult(answers){
     });
   });
 
-  const total = questions.length;
+  const total = mcqQuestions.length;
   const pct = total > 0 ? Math.round((correctCount/total)*100) : 0;
+
+  const subjectiveQuestions = subjQuestions.map(q => {
+    const ans = answers[q.id];
+    const answerText = (ans && typeof ans === 'object' && ans.text) ? ans.text : '';
+    return {
+      id: q.id, section: q.section, module: q.module, question: q.question,
+      maxMarks: q.maxMarks, answerText: answerText,
+      awardedMarks: null, feedback: '', evaluated: false
+    };
+  });
+
   return {
     correctCount, total, pct,
     pass: pct >= PASS_PCT,
-    sectionScores: sections.map(s => ({ section: s, ...sectionMap[s], pct: Math.round((sectionMap[s].correct/sectionMap[s].total)*100) })),
+    sectionScores: mcqSections.map(s => ({ section: s, ...sectionMap[s], pct: Math.round((sectionMap[s].correct/sectionMap[s].total)*100) })),
     perQuestion,
+    hasSubjective: subjectiveQuestions.length > 0,
+    subjective: {
+      questions: subjectiveQuestions,
+      totalMax: subjectiveQuestions.reduce((a,q)=>a+q.maxMarks,0),
+      totalAwarded: 0,
+      allEvaluated: subjectiveQuestions.length === 0,
+      evaluatedBy: '',
+      evaluatedAt: ''
+    },
     timestamp: new Date().toISOString()
   };
 }
@@ -607,6 +678,7 @@ function renderTopbar(mode){
         <span class="logout" onclick="logout()">Log out</span>
       </div>
       <button class="link-btn" onclick="goMyResults()">My Results</button>
+      <button class="link-btn" onclick="goEvaluatorEntry()">Evaluate</button>
       <button class="link-btn" onclick="goAdmin()">Team Report</button>`;
   } else if (mode === 'inTest'){
     right = `<button class="link-btn" onclick="exitToTestSelect()">Home</button>`;
@@ -751,7 +823,7 @@ function renderNavigator(){
   const questions = currentQuestions();
   let dots = "";
   questions.forEach((q, i) => {
-    const answered = state.answers[q.id] !== undefined;
+    const answered = isQuestionAnswered(q);
     const isCurrent = i === state.currentIndex;
     let cls = "nav-dot";
     if (isCurrent) cls += " current";
@@ -764,7 +836,7 @@ function renderNavigator(){
 function renderLeaveWarningModal(){
   if (!state.showLeaveWarning) return '';
   const total = currentTotalQ();
-  const answeredCount = Object.keys(state.answers).length;
+  const answeredCount = currentQuestions().filter(isQuestionAnswered).length;
   return `
     <div class="modal-overlay" onclick="if(event.target===this) cancelLeaveWarning()">
       <div class="card modal-card pad">
@@ -783,19 +855,31 @@ function renderTest(){
   const questions = currentQuestions();
   const totalQ = questions.length;
   const q = questions[state.currentIndex];
-  const chosen = state.answers[q.id];
-  const answeredCount = Object.keys(state.answers).length;
+  const chosen = q.type === 'subjective' ? undefined : state.answers[q.id];
+  const answeredCount = questions.filter(isQuestionAnswered).length;
   const isLast = state.currentIndex === totalQ - 1;
   const isFirst = state.currentIndex === 0;
 
-  let optsHtml = "";
-  q.options.forEach((opt, i) => {
-    optsHtml += `
-      <div class="opt ${chosen===i?'selected':''}" onclick="selectOption(${q.id},${i})">
-        <div class="letter">${LETTERS[i]}</div>
-        <div>${escapeHtml(opt)}</div>
+  let bodyHtml = "";
+  if (q.type === 'subjective'){
+    const currentText = (state.answers[q.id] && state.answers[q.id].text) || '';
+    bodyHtml = `
+      <div class="subjective-wrap">
+        <div class="subjective-marks-tag">Worth ${q.maxMarks} mark${q.maxMarks!==1?'s':''} · evaluated by a reviewer after submission</div>
+        <textarea id="subj-answer-${q.id}" class="subj-textarea" placeholder="Type your answer here…"
+          oninput="setSubjectiveAnswer(${q.id}, this.value)" onblur="saveProgressRemote()">${escapeHtml(currentText)}</textarea>
       </div>`;
-  });
+  } else {
+    let optsHtml = "";
+    q.options.forEach((opt, i) => {
+      optsHtml += `
+        <div class="opt ${chosen===i?'selected':''}" onclick="selectOption(${q.id},${i})">
+          <div class="letter">${LETTERS[i]}</div>
+          <div>${escapeHtml(opt)}</div>
+        </div>`;
+    });
+    bodyHtml = `<div class="options">${optsHtml}</div>`;
+  }
 
   const meta = currentTestMeta();
   const hasTimer = meta && meta.durationMinutes > 0;
@@ -821,7 +905,7 @@ function renderTest(){
           <div class="qtext">${escapeHtml(q.question)}</div>
         </div>
         <div class="qmodule">Related Module: ${escapeHtml(q.module)}</div>
-        <div class="options">${optsHtml}</div>
+        ${bodyHtml}
       </div>
 
       <div class="nav-bar">
@@ -890,6 +974,42 @@ function renderReviewList(perQuestion, filter){
   }).join("");
 }
 
+function renderSubjectiveReviewSection(r){
+  if (!r.hasSubjective) return '';
+  const qs = r.subjective.questions;
+  const items = qs.map(q => {
+    if (q.evaluated){
+      return `
+        <div class="review-item card correct" style="border-left-color:var(--navy-2);">
+          <div class="rtop">
+            <div>
+              <div class="rq">Q${q.id}. ${escapeHtml(q.question)}</div>
+              <div class="rmod">Related Module: ${escapeHtml(q.module)} · Worth ${q.maxMarks} mark${q.maxMarks!==1?'s':''}</div>
+            </div>
+            <div class="r-status" style="background:var(--navy-2);color:#fff;">${q.awardedMarks} / ${q.maxMarks}</div>
+          </div>
+          <div class="ropt" style="background:#F5F6F8;">${escapeHtml(q.answerText || '(no answer given)')}</div>
+          ${q.feedback ? `<div class="ropt correct-answer" style="margin-top:6px;"><b>Evaluator feedback:</b>&nbsp;${escapeHtml(q.feedback)}</div>` : ''}
+        </div>`;
+    }
+    return `
+      <div class="review-item card" style="border-left-color:var(--amber);">
+        <div class="rtop">
+          <div>
+            <div class="rq">Q${q.id}. ${escapeHtml(q.question)}</div>
+            <div class="rmod">Related Module: ${escapeHtml(q.module)} · Worth ${q.maxMarks} mark${q.maxMarks!==1?'s':''}</div>
+          </div>
+          <div class="r-status" style="background:var(--amber-soft);color:var(--amber);">Pending evaluation</div>
+        </div>
+        <div class="ropt" style="background:#F5F6F8;">${escapeHtml(q.answerText || '(no answer given)')}</div>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="section-title-row"><h3>Subjective questions</h3></div>
+    <div style="margin-top:14px;">${items}</div>`;
+}
+
 function renderReport(){
   const r = state.result;
   const testMeta = state.testCatalog.find(t => t.testId === state.testId);
@@ -905,11 +1025,19 @@ function renderReport(){
         <div class="card pad" style="margin-bottom:16px;border-color:var(--red);background:var(--red-soft);">
           <b>Time's up</b> — this test auto-submitted because the time limit was reached. Answers you'd made before then are scored below.
         </div>` : ''}
+      ${r.hasSubjective && !r.subjective.allEvaluated ? `
+        <div class="card pad" style="margin-bottom:16px;border-color:var(--amber);background:var(--amber-soft);">
+          <b>${r.subjective.questions.filter(q=>!q.evaluated).length} subjective question(s) awaiting evaluation</b> — the score below covers only the auto-graded (multiple-choice) portion. Your final score will update once an evaluator reviews your written answers.
+        </div>` : ''}
+      ${r.hasSubjective && r.subjective.allEvaluated ? `
+        <div class="card pad" style="margin-bottom:16px;border-color:var(--green);background:var(--green-soft);">
+          <b>Subjective answers evaluated</b> — you scored ${r.subjective.totalAwarded} / ${r.subjective.totalMax} on the written portion (see below).
+        </div>` : ''}
       <div class="card score-hero">
         ${renderGauge(r.pct)}
         <div class="score-side">
           <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
-          <h2 style="margin-top:10px;">${escapeHtml(testName)} — ${r.correctCount} / ${r.total}</h2>
+          <h2 style="margin-top:10px;">${escapeHtml(testName)} — ${r.correctCount} / ${r.total}${r.hasSubjective ? ' (multiple-choice)' : ''}</h2>
           <p>${r.pass
             ? "Strong grasp of the material covered. Review any missed items below to close the remaining gaps."
             : `Pass mark is ${PASS_PCT}%. Review the incorrect answers below.`}</p>
@@ -925,6 +1053,8 @@ function renderReport(){
         <div class="filter-chip ${state.reviewFilter==='correct'?'active':''}" onclick="setReviewFilter('correct')">Correct (${r.correctCount})</div>
       </div>
       <div style="margin-top:14px;">${renderReviewList(r.perQuestion, state.reviewFilter)}</div>
+
+      ${renderSubjectiveReviewSection(r)}
     </div>`;
 }
 
@@ -1045,7 +1175,9 @@ function renderAdminViewToggle(){
 function renderMemberFilter(availableEmails){
   const selectedCount = state.memberFilter.length;
   const label = selectedCount === 0 ? "Filter by member" : `${selectedCount} member${selectedCount!==1?'s':''} selected`;
-  const options = availableEmails.map(email => {
+  const query = (state.memberFilterSearch || '').trim().toLowerCase();
+  const visibleEmails = query ? availableEmails.filter(e => e.toLowerCase().includes(query)) : availableEmails;
+  const options = visibleEmails.map(email => {
     const checked = state.memberFilter.includes(email);
     return `
       <label class="mf-option">
@@ -1062,7 +1194,8 @@ function renderMemberFilter(availableEmails){
             <span>Filter by team member</span>
             <span class="link-btn" style="color:var(--navy-2);" onclick="clearMemberFilter()">Clear</span>
           </div>
-          <div class="mf-list">${options || '<div class="mf-empty">No submissions yet.</div>'}</div>
+          ${availableEmails.length > 6 ? `<input id="mf-search-input" type="text" class="mf-search" placeholder="Search members…" value="${escapeHtml(state.memberFilterSearch)}" oninput="setMemberFilterSearch(this.value)"/>` : ''}
+          <div class="mf-list">${options || `<div class="mf-empty">${query ? 'No members match your search.' : 'No submissions yet.'}</div>`}</div>
           <button class="btn btn-primary" style="width:100%;margin-top:12px;padding:9px;" onclick="closeMemberFilterPanel()">OK</button>
         </div>` : ''}
     </div>`;
@@ -1135,7 +1268,110 @@ function renderAdminOverall(){
     </div>`;
 }
 
+// ---------- Evaluator ----------
+function renderEvaluator(){
+  if (state.evaluatorCatalogLoading){
+    return `${renderTopbar('admin')}<div class="app wide"><div class="loading-inline"><div class="spinner"></div> Loading evaluator data…</div></div>`;
+  }
+  if (state.evaluatorCatalog.length === 0){
+    return `${renderTopbar('admin')}<div class="app wide">
+      <div class="empty-state card pad">No assessments currently contain subjective questions to evaluate.</div>
+    </div>`;
+  }
+
+  const selectOptions = state.evaluatorCatalog.map(t =>
+    `<option value="${escapeHtml(t.testId)}" ${state.evaluatorTestId===t.testId?'selected':''}>${escapeHtml(t.name)}</option>`
+  ).join("");
+  const selector = `<div class="admin-select-wrap"><select onchange="switchEvaluatorTest(this.value)">${selectOptions}</select></div>`;
+
+  if (state.evaluatorSelectedIdx !== null){
+    return `${renderTopbar('admin')}<div class="app wide">${renderEvaluationForm()}</div>`;
+  }
+
+  if (state.evaluatorLoading){
+    return `${renderTopbar('admin')}<div class="app wide">${selector}<div class="loading-inline"><div class="spinner"></div> Loading submissions…</div></div>`;
+  }
+
+  const subs = state.evaluatorSubmissions;
+  const testMeta = state.evaluatorCatalog.find(t => t.testId === state.evaluatorTestId);
+
+  if (subs.length === 0){
+    return `${renderTopbar('admin')}<div class="app wide">${selector}<div class="empty-state card pad">No submissions yet for "${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)}".</div></div>`;
+  }
+
+  const rows = subs.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map(s => {
+    const realIdx = subs.indexOf(s);
+    const subj = s.result.subjective;
+    const evaluatedCount = subj ? subj.questions.filter(q=>q.evaluated).length : 0;
+    const totalQ = subj ? subj.questions.length : 0;
+    const complete = subj && subj.allEvaluated;
+    const canEvaluate = !!s.submissionId;
+    return `
+      <tr class="${canEvaluate ? 'clickable' : ''}" ${canEvaluate ? `onclick="openEvaluationForm(${realIdx})"` : ''}>
+        <td>${escapeHtml(s.name)}</td>
+        <td class="mono">${fmtDate(s.timestamp)}</td>
+        <td>${evaluatedCount} / ${totalQ} evaluated</td>
+        <td><span class="score-pill ${complete?'pass':'fail'}">${complete ? 'Complete' : 'Pending'}</span></td>
+        <td>${canEvaluate ? '' : '<span style="font-size:12px;color:var(--ink-mute);">No ID — predates evaluation feature</span>'}</td>
+      </tr>`;
+  }).join("");
+
+  const pendingCount = subs.filter(s => s.result.subjective && !s.result.subjective.allEvaluated).length;
+
+  return `
+    ${renderTopbar('admin')}
+    <div class="app wide">
+      ${selector}
+      <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)} — Evaluate Answers</h2>
+      <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${subs.length} submission${subs.length!==1?'s':''} · ${pendingCount} awaiting evaluation</p>
+      <div class="card" style="overflow:hidden;">
+        <table class="admin-table">
+          <thead><tr><th>Email</th><th>Submitted</th><th>Progress</th><th>Status</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderEvaluationForm(){
+  const sub = state.evaluatorSubmissions[state.evaluatorSelectedIdx];
+  const subj = sub.result.subjective;
+  const items = subj.questions.map(q => {
+    const marksVal = state.evalMarksDraft[q.id] !== undefined ? state.evalMarksDraft[q.id] : '';
+    const feedbackVal = state.evalFeedbackDraft[q.id] !== undefined ? state.evalFeedbackDraft[q.id] : '';
+    return `
+      <div class="card pad" style="margin-bottom:14px;">
+        <div style="font-weight:500;font-size:14.5px;margin-bottom:4px;">Q${q.id}. ${escapeHtml(q.question)}</div>
+        <div style="font-size:12px;color:var(--ink-mute);font-style:italic;margin-bottom:14px;">Related Module: ${escapeHtml(q.module)} · Worth ${q.maxMarks} mark${q.maxMarks!==1?'s':''}</div>
+        <div class="ropt" style="background:#F5F6F8;margin-bottom:14px;">${escapeHtml(q.answerText || '(no answer given)')}</div>
+        <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="field" style="max-width:120px;margin:0;">
+            <label>Marks (0–${q.maxMarks})</label>
+            <input type="number" min="0" max="${q.maxMarks}" id="marks-${q.id}" value="${escapeHtml(marksVal)}" oninput="setEvalMarks(${q.id}, this.value)"/>
+          </div>
+          <div class="field" style="flex:1;min-width:220px;margin:0;">
+            <label>Feedback (optional)</label>
+            <input type="text" id="feedback-${q.id}" value="${escapeHtml(feedbackVal)}" oninput="setEvalFeedback(${q.id}, this.value)" placeholder="Short note for the test-taker…"/>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="back-link" onclick="state.evaluatorSelectedIdx=null; render()">← Back to submissions</div>
+    <div class="card pad" style="margin-bottom:18px;">
+      <h3 style="margin:0 0 4px;">${escapeHtml(sub.name)}</h3>
+      <p style="color:var(--ink-mute);font-size:13px;margin:0;">Submitted ${fmtDate(sub.timestamp)} · MCQ score: ${sub.result.correctCount}/${sub.result.total}</p>
+    </div>
+    ${items}
+    <button class="btn btn-primary" ${state.evaluatorSaving?'disabled style="opacity:.6;"':''} onclick="submitEvaluation()">${state.evaluatorSaving ? 'Saving…' : 'Save Evaluation'}</button>
+  `;
+}
+
 function renderAdmin(){
+  if (state.adminCatalogLoading){
+    return `${renderTopbar('admin')}<div class="app wide"><div class="loading-inline"><div class="spinner"></div> Assessment data is loading…</div></div>`;
+  }
   if (state.adminCatalog.length === 0){
     return `${renderTopbar('admin')}<div class="app wide"><div class="empty-state card pad">No assessments published yet.</div></div>`;
   }
@@ -1259,6 +1495,13 @@ function renderAdmin(){
 }
 
 function render(){
+  const ae = document.activeElement;
+  let activeId = null, selStart = null, selEnd = null;
+  if (ae && ae.id){
+    activeId = ae.id;
+    if (typeof ae.selectionStart === 'number'){ selStart = ae.selectionStart; selEnd = ae.selectionEnd; }
+  }
+
   document.getElementById("root").innerHTML =
     state.view === "config-missing" ? renderConfigMissing() :
     state.view === "login" ? renderLogin() :
@@ -1269,7 +1512,18 @@ function render(){
     state.view === "report" ? renderReport() :
     state.view === "admin-gate" ? renderAdminGate() :
     state.view === "admin" ? renderAdmin() :
+    state.view === "evaluator" ? renderEvaluator() :
     state.view === "my-results" ? renderMyResults() : "";
+
+  if (activeId){
+    const el = document.getElementById(activeId);
+    if (el){
+      el.focus();
+      if (selStart !== null && el.setSelectionRange){
+        try { el.setSelectionRange(selStart, selEnd); } catch(e){}
+      }
+    }
+  }
 
   // Post-render hooks that need real DOM nodes to exist
   if (state.view === "login" && !state.authChecking && googleConfigured()){
@@ -1434,6 +1688,12 @@ function selectOption(qid, idx){
   saveProgressRemote();
 }
 
+function setSubjectiveAnswer(qid, text){
+  state.answers[qid] = { type: 'subjective', text: text };
+  // Note: intentionally not calling render() on every keystroke (would rebuild the
+  // navigator/progress bar constantly); saved on blur instead via saveProgressRemote().
+}
+
 function goNext(){
   if (state.currentIndex < currentTotalQ() - 1){
     state.currentIndex++;
@@ -1459,9 +1719,9 @@ function jumpToQuestion(idx){
 
 function attemptSubmit(){
   const questions = currentQuestions();
-  const answeredCount = Object.keys(state.answers).length;
+  const answeredCount = questions.filter(isQuestionAnswered).length;
   if (answeredCount < questions.length){
-    const firstUnanswered = questions.findIndex(q => state.answers[q.id] === undefined);
+    const firstUnanswered = questions.findIndex(q => !isQuestionAnswered(q));
     if (!confirm(`You still have ${questions.length - answeredCount} unanswered question(s). Go to the first unanswered question?`)) return;
     state.currentIndex = firstUnanswered;
     render();
@@ -1492,14 +1752,15 @@ function confirmLeaveWithoutSubmitting(){
 async function submitTest(){
   stopTimer();
   const result = computeResult(state.answers);
+  const submissionId = generateSubmissionId();
   state.result = result;
   state.viewingPastResult = false;
   state.view = "report";
   render();
   window.scrollTo(0,0);
   try {
-    await submitRemote(result);
-    state.testStatuses[state.testId] = { timestamp: result.timestamp, email: state.email, testId: state.testId, result: result };
+    await submitRemote(result, submissionId);
+    state.testStatuses[state.testId] = { timestamp: result.timestamp, email: state.email, testId: state.testId, result: result, submissionId: submissionId };
   } catch(e) { /* still show the report even if save fails */ }
 }
 
@@ -1536,27 +1797,131 @@ function goHomeFromAdmin(){
 }
 
 async function goAdmin(){
+  state.pendingViewAfterUnlock = "admin";
   state.view = state.adminUnlocked ? "admin" : "admin-gate";
   state.selectedSubmissionIdx = null;
+  if (state.adminUnlocked && state.adminCatalog.length === 0){
+    state.adminCatalogLoading = true;
+  }
   render();
   if (state.adminUnlocked) {
     if (state.adminCatalog.length === 0){
       state.adminCatalog = await fetchTestCatalog();
       state.adminTestId = state.adminCatalog.length ? state.adminCatalog[0].testId : null;
+      state.adminCatalogLoading = false;
     }
     loadAdminData();
   }
+}
+
+async function goEvaluatorEntry(){
+  state.pendingViewAfterUnlock = "evaluator";
+  if (state.adminUnlocked){
+    goEvaluator();
+  } else {
+    state.view = "admin-gate";
+    render();
+  }
+}
+
+async function goEvaluator(){
+  state.view = "evaluator";
+  state.evaluatorSelectedIdx = null;
+  render();
+
+  if (state.evaluatorCatalog.length === 0){
+    state.evaluatorCatalogLoading = true;
+    render();
+    const all = await fetchTestCatalog();
+    state.evaluatorCatalog = all.filter(t => t.hasSubjective);
+    state.evaluatorTestId = state.evaluatorCatalog.length ? state.evaluatorCatalog[0].testId : null;
+    state.evaluatorCatalogLoading = false;
+    render();
+  }
+
+  if (state.evaluatorTestId){
+    loadEvaluatorSubmissions();
+  }
+}
+
+function switchEvaluatorTest(testId){
+  state.evaluatorTestId = testId;
+  state.evaluatorSelectedIdx = null;
+  loadEvaluatorSubmissions();
+}
+
+async function loadEvaluatorSubmissions(){
+  state.evaluatorLoading = true;
+  render();
+  state.evaluatorSubmissions = await loadSubmissionsForAdmin(state.evaluatorTestId);
+  state.evaluatorLoading = false;
+  render();
+}
+
+function openEvaluationForm(idx){
+  state.evaluatorSelectedIdx = idx;
+  const sub = state.evaluatorSubmissions[idx];
+  state.evalMarksDraft = {};
+  state.evalFeedbackDraft = {};
+  if (sub.result.subjective){
+    sub.result.subjective.questions.forEach(q => {
+      state.evalMarksDraft[q.id] = q.evaluated ? String(q.awardedMarks) : "";
+      state.evalFeedbackDraft[q.id] = q.feedback || "";
+    });
+  }
+  render();
+}
+
+function setEvalMarks(qid, val){
+  state.evalMarksDraft[qid] = val;
+}
+function setEvalFeedback(qid, val){
+  state.evalFeedbackDraft[qid] = val;
+}
+
+async function submitEvaluation(){
+  const sub = state.evaluatorSubmissions[state.evaluatorSelectedIdx];
+  if (!sub || !sub.submissionId){
+    alert("This submission doesn't have an evaluation ID (it may predate this feature) and can't be evaluated.");
+    return;
+  }
+  state.evaluatorSaving = true;
+  render();
+
+  const marks = {};
+  const feedback = {};
+  sub.result.subjective.questions.forEach(q => {
+    const val = state.evalMarksDraft[q.id];
+    if (val !== "" && val !== undefined && val !== null){
+      marks[q.id] = val;
+      feedback[q.id] = state.evalFeedbackDraft[q.id] || "";
+    }
+  });
+
+  try {
+    await saveEvaluationRemote(state.evaluatorTestId, sub.submissionId, marks, feedback);
+  } catch(e) { /* non-fatal, list refresh below will show current saved state either way */ }
+
+  state.evaluatorSaving = false;
+  state.evaluatorSelectedIdx = null;
+  await loadEvaluatorSubmissions();
 }
 
 async function checkAdminCode(){
   if (state.adminCodeInput === ADMIN_CODE){
     state.adminUnlocked = true;
     state.adminError = false;
-    state.view = "admin";
-    render();
-    state.adminCatalog = await fetchTestCatalog();
-    state.adminTestId = state.adminCatalog.length ? state.adminCatalog[0].testId : null;
-    loadAdminData();
+    if (state.pendingViewAfterUnlock === "evaluator"){
+      goEvaluator();
+    } else {
+      state.view = "admin";
+      state.adminCatalogLoading = true;
+      render();
+      state.adminCatalog = await fetchTestCatalog();
+      state.adminTestId = state.adminCatalog.length ? state.adminCatalog[0].testId : null;
+      state.adminCatalogLoading = false;
+      loadAdminData();
+    }
   } else {
     state.adminError = true;
     render();
@@ -1587,6 +1952,7 @@ async function switchAdminView(view){
 function toggleMemberFilterPanel(evt){
   if (evt) evt.stopPropagation();
   state.memberFilterOpen = !state.memberFilterOpen;
+  if (!state.memberFilterOpen) state.memberFilterSearch = "";
   render();
 }
 function toggleMemberFilter(email){
@@ -1595,13 +1961,19 @@ function toggleMemberFilter(email){
   else state.memberFilter.splice(idx, 1);
   render();
 }
+function setMemberFilterSearch(val){
+  state.memberFilterSearch = val;
+  render();
+}
 function closeMemberFilterPanel(){
   state.memberFilterOpen = false;
+  state.memberFilterSearch = "";
   render();
 }
 function clearMemberFilter(){
   state.memberFilter = [];
   state.memberFilterOpen = false;
+  state.memberFilterSearch = "";
   render();
 }
 
