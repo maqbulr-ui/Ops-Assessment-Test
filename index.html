@@ -771,7 +771,7 @@ function testCardStatus(testId){
 function renderTestSelect(){
   const query = state.testSearchQuery.trim().toLowerCase();
   const filtered = state.testCatalog.filter(t =>
-    !query || t.name.toLowerCase().includes(query) || (t.description||'').toLowerCase().includes(query)
+    t.active !== false && (!query || t.name.toLowerCase().includes(query) || (t.description||'').toLowerCase().includes(query))
   );
 
   const cards = filtered.map(test => {
@@ -809,17 +809,19 @@ function renderTestSelect(){
       </div>`;
   }).join("");
 
+  const activeCount = state.testCatalog.filter(t => t.active !== false).length;
+
   const empty = filtered.length === 0 ? `
     <div class="empty-state card pad">
-      ${state.testCatalog.length === 0 ? 'No assessments are published yet.' : 'No assessments match your search.'}
+      ${activeCount === 0 ? 'No assessments are published yet.' : 'No assessments match your search.'}
     </div>` : '';
 
   return `
     ${renderTopbar('loggedIn')}
     <div class="app">
       <h2 style="margin-bottom:4px;">Available Assessments</h2>
-      <p style="color:var(--ink-mute);font-size:13.5px;margin:0 0 20px;">Signed in as ${escapeHtml(state.email)} · ${state.testCatalog.length} assessment${state.testCatalog.length!==1?'s':''} available</p>
-      ${state.testCatalog.length > 6 ? `
+      <p style="color:var(--ink-mute);font-size:13.5px;margin:0 0 20px;">Signed in as ${escapeHtml(state.email)} · ${activeCount} assessment${activeCount!==1?'s':''} available</p>
+      ${activeCount > 6 ? `
       <div class="search-field">
         <input type="text" placeholder="Search assessments by name…" value="${escapeHtml(state.testSearchQuery)}" oninput="setTestSearch(this.value)"/>
       </div>` : ''}
@@ -1079,7 +1081,7 @@ function renderReport(){
 // ---------- My Results (personal, dropdown-based like the admin view) ----------
 function renderMyOverallSummary(){
   const subs = Object.values(state.testStatuses);
-  const totalTests = state.testCatalog.length;
+  const totalTests = state.testCatalog.filter(t => t.active !== false || state.testStatuses[t.testId]).length;
   const completed = subs.length;
   if (completed === 0){
     return `
@@ -1103,7 +1105,7 @@ function renderMyResults(){
   }
 
   const selectOptions = state.testCatalog.map(t =>
-    `<option value="${escapeHtml(t.testId)}" ${state.myResultsTestId===t.testId?'selected':''}>${escapeHtml(t.name)}</option>`
+    `<option value="${escapeHtml(t.testId)}" ${state.myResultsTestId===t.testId?'selected':''}>${escapeHtml(t.name)}${t.active===false?' (Inactive)':''}</option>`
   ).join("");
   const selector = `
     <div class="admin-select-wrap">
@@ -1114,12 +1116,15 @@ function renderMyResults(){
   const sub = state.testStatuses[state.myResultsTestId];
 
   if (!sub){
+    const isInactive = meta && meta.active === false;
     return `${renderTopbar('inTest')}<div class="app wide">
       ${renderMyOverallSummary()}
       ${selector}
       <div class="empty-state card pad">
         You haven't completed "${escapeHtml(meta ? meta.name : state.myResultsTestId)}" yet.
-        <div style="margin-top:16px;"><button class="btn btn-primary" onclick="beginTest('${state.myResultsTestId}')">Start test</button></div>
+        ${isInactive
+          ? `<div style="margin-top:10px;font-size:13px;">This assessment is not currently active, so it can't be started.</div>`
+          : `<div style="margin-top:16px;"><button class="btn btn-primary" onclick="beginTest('${state.myResultsTestId}')">Start test</button></div>`}
       </div>
     </div>`;
   }
@@ -1443,7 +1448,7 @@ function renderAdmin(){
   }
 
   const selectOptions = state.adminCatalog.map(t =>
-    `<option value="${escapeHtml(t.testId)}" ${state.adminTestId===t.testId?'selected':''}>${escapeHtml(t.name)}</option>`
+    `<option value="${escapeHtml(t.testId)}" ${state.adminTestId===t.testId?'selected':''}>${escapeHtml(t.name)}${t.active===false?' (Inactive)':''}</option>`
   ).join("");
 
   const selector = `
