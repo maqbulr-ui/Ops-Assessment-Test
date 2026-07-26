@@ -391,6 +391,7 @@ const state = {
   evaluatorSubmissions: [],
   evaluatorLoading: false,
   evaluatorSelectedIdx: null,
+  evaluatorStatusFilter: "pending",
   evalMarksDraft: {},
   evalFeedbackDraft: {},
   evaluatorSaving: false,
@@ -562,7 +563,7 @@ function computeResult(answers){
   const subjQuestions = allQuestions.filter(q => q.type === 'subjective');
 
   const mcqSections = [...new Set(mcqQuestions.map(q => q.section))];
-  let correctCount = 0;
+  let mcqCorrect = 0;
   const perQuestion = [];
   const sectionMap = {};
   mcqSections.forEach(s => sectionMap[s] = {correct:0, total:0});
@@ -570,7 +571,7 @@ function computeResult(answers){
   mcqQuestions.forEach(q => {
     const chosen = answers[q.id];
     const isCorrect = chosen === q.correct;
-    if (isCorrect) correctCount++;
+    if (isCorrect) mcqCorrect++;
     sectionMap[q.section].total++;
     if (isCorrect) sectionMap[q.section].correct++;
     perQuestion.push({
@@ -579,8 +580,7 @@ function computeResult(answers){
     });
   });
 
-  const total = mcqQuestions.length;
-  const pct = total > 0 ? Math.round((correctCount/total)*100) : 0;
+  const mcqTotal = mcqQuestions.length;
 
   const subjectiveQuestions = subjQuestions.map(q => {
     const ans = answers[q.id];
@@ -591,16 +591,34 @@ function computeResult(answers){
       awardedMarks: null, feedback: '', evaluated: false
     };
   });
+  const subjectiveMaxTotal = subjectiveQuestions.reduce((a,q)=>a+q.maxMarks,0);
+
+  // Overall/combined score: MCQ correct answers worth 1 point each, plus subjective
+  // marks (0 until evaluated). Denominator is fixed from submission time: every MCQ
+  // question (1 pt) plus every subjective question's max marks.
+  const combinedTotal = mcqTotal + subjectiveMaxTotal;
+  const combinedAchieved = mcqCorrect; // subjective contributes 0 until evaluated
+  const combinedPct = combinedTotal > 0 ? Math.round((combinedAchieved/combinedTotal)*100) : 0;
 
   return {
-    correctCount, total, pct,
-    pass: pct >= PASS_PCT,
+    // Combined overall score — this is what's shown as THE score everywhere
+    // (report gauge, team dashboards, CSV exports). Updates as subjective
+    // questions get evaluated (see saveEvaluation on the backend).
+    correctCount: combinedAchieved,
+    total: combinedTotal,
+    pct: combinedPct,
+    pass: combinedPct >= PASS_PCT,
+
+    // Raw MCQ-only stats, kept separately so the "Review your answers" /
+    // section-breakdown views (which only ever cover MCQ questions) stay correct.
+    mcqCorrect, mcqTotal,
+
     sectionScores: mcqSections.map(s => ({ section: s, ...sectionMap[s], pct: Math.round((sectionMap[s].correct/sectionMap[s].total)*100) })),
     perQuestion,
     hasSubjective: subjectiveQuestions.length > 0,
     subjective: {
       questions: subjectiveQuestions,
-      totalMax: subjectiveQuestions.reduce((a,q)=>a+q.maxMarks,0),
+      totalMax: subjectiveMaxTotal,
       totalAwarded: 0,
       allEvaluated: subjectiveQuestions.length === 0,
       evaluatedBy: '',
@@ -1027,17 +1045,17 @@ function renderReport(){
         </div>` : ''}
       ${r.hasSubjective && !r.subjective.allEvaluated ? `
         <div class="card pad" style="margin-bottom:16px;border-color:var(--amber);background:var(--amber-soft);">
-          <b>${r.subjective.questions.filter(q=>!q.evaluated).length} subjective question(s) awaiting evaluation</b> — the score below covers only the auto-graded (multiple-choice) portion. Your final score will update once an evaluator reviews your written answers.
+          <b>${r.subjective.questions.filter(q=>!q.evaluated).length} subjective question(s) awaiting evaluation</b> — the overall score below is provisional (subjective marks count as 0 until evaluated) and will update once an evaluator reviews your written answers.
         </div>` : ''}
       ${r.hasSubjective && r.subjective.allEvaluated ? `
         <div class="card pad" style="margin-bottom:16px;border-color:var(--green);background:var(--green-soft);">
-          <b>Subjective answers evaluated</b> — you scored ${r.subjective.totalAwarded} / ${r.subjective.totalMax} on the written portion (see below).
+          <b>Subjective answers evaluated</b> — you scored ${r.subjective.totalAwarded} / ${r.subjective.totalMax} on the written portion, included in the overall score below.
         </div>` : ''}
       <div class="card score-hero">
         ${renderGauge(r.pct)}
         <div class="score-side">
           <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
-          <h2 style="margin-top:10px;">${escapeHtml(testName)} — ${r.correctCount} / ${r.total}${r.hasSubjective ? ' (multiple-choice)' : ''}</h2>
+          <h2 style="margin-top:10px;">${escapeHtml(testName)} — ${r.correctCount} / ${r.total}${r.hasSubjective && !r.subjective.allEvaluated ? ' (provisional)' : ''}</h2>
           <p>${r.pass
             ? "Strong grasp of the material covered. Review any missed items below to close the remaining gaps."
             : `Pass mark is ${PASS_PCT}%. Review the incorrect answers below.`}</p>
@@ -1046,11 +1064,11 @@ function renderReport(){
 
       ${renderBreakdown(r.sectionScores)}
 
-      <div class="section-title-row"><h3>Review your answers</h3></div>
+      <div class="section-title-row"><h3>Review your answers ${r.hasSubjective ? '(multiple-choice)' : ''}</h3></div>
       <div class="filter-row">
-        <div class="filter-chip ${state.reviewFilter==='all'?'active':''}" onclick="setReviewFilter('all')">All (${r.total})</div>
-        <div class="filter-chip ${state.reviewFilter==='incorrect'?'active':''}" onclick="setReviewFilter('incorrect')">Incorrect (${r.total-r.correctCount})</div>
-        <div class="filter-chip ${state.reviewFilter==='correct'?'active':''}" onclick="setReviewFilter('correct')">Correct (${r.correctCount})</div>
+        <div class="filter-chip ${state.reviewFilter==='all'?'active':''}" onclick="setReviewFilter('all')">All (${r.mcqTotal})</div>
+        <div class="filter-chip ${state.reviewFilter==='incorrect'?'active':''}" onclick="setReviewFilter('incorrect')">Incorrect (${r.mcqTotal-r.mcqCorrect})</div>
+        <div class="filter-chip ${state.reviewFilter==='correct'?'active':''}" onclick="setReviewFilter('correct')">Correct (${r.mcqCorrect})</div>
       </div>
       <div style="margin-top:14px;">${renderReviewList(r.perQuestion, state.reviewFilter)}</div>
 
@@ -1154,13 +1172,14 @@ function renderAdminDetail(sub){
       ${renderGauge(r.pct)}
       <div class="score-side">
         <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
-        <h2 style="margin-top:10px;">${escapeHtml(sub.name)} — ${r.correctCount} / ${r.total}</h2>
+        <h2 style="margin-top:10px;">${escapeHtml(sub.name)} — ${r.correctCount} / ${r.total}${r.hasSubjective && !r.subjective.allEvaluated ? ' (provisional)' : ''}</h2>
         <p>Submitted ${fmtDate(sub.timestamp)}</p>
       </div>
     </div>
     ${renderBreakdown(r.sectionScores)}
-    <div class="section-title-row"><h3>Answer detail</h3></div>
+    <div class="section-title-row"><h3>Answer detail (multiple-choice)</h3></div>
     <div style="margin-top:14px;">${renderReviewList(r.perQuestion, 'all')}</div>
+    ${renderSubjectiveReviewSection(r)}
   `;
 }
 
@@ -1299,7 +1318,33 @@ function renderEvaluator(){
     return `${renderTopbar('admin')}<div class="app wide">${selector}<div class="empty-state card pad">No submissions yet for "${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)}".</div></div>`;
   }
 
-  const rows = subs.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map(s => {
+  const pendingCount = subs.filter(s => s.result.subjective && !s.result.subjective.allEvaluated).length;
+  const completedCount = subs.filter(s => s.result.subjective && s.result.subjective.allEvaluated).length;
+
+  const statusFilter = state.evaluatorStatusFilter || 'pending';
+  const filteredSubs = subs.filter(s => {
+    const complete = s.result.subjective && s.result.subjective.allEvaluated;
+    if (statusFilter === 'pending') return !complete;
+    if (statusFilter === 'completed') return complete;
+    return true;
+  });
+
+  const statusTabs = `
+    <div class="test-tabs" style="margin:0 0 18px;">
+      <div class="test-tab ${statusFilter==='pending'?'active':''}" onclick="setEvaluatorStatusFilter('pending')">Pending (${pendingCount})</div>
+      <div class="test-tab ${statusFilter==='completed'?'active':''}" onclick="setEvaluatorStatusFilter('completed')">Completed (${completedCount})</div>
+      <div class="test-tab ${statusFilter==='all'?'active':''}" onclick="setEvaluatorStatusFilter('all')">All (${subs.length})</div>
+    </div>`;
+
+  if (filteredSubs.length === 0){
+    return `${renderTopbar('admin')}<div class="app wide">
+      ${selector}
+      ${statusTabs}
+      <div class="empty-state card pad">No ${statusFilter === 'all' ? '' : statusFilter} submissions for "${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)}".</div>
+    </div>`;
+  }
+
+  const rows = filteredSubs.slice().sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)).map(s => {
     const realIdx = subs.indexOf(s);
     const subj = s.result.subjective;
     const evaluatedCount = subj ? subj.questions.filter(q=>q.evaluated).length : 0;
@@ -1316,14 +1361,13 @@ function renderEvaluator(){
       </tr>`;
   }).join("");
 
-  const pendingCount = subs.filter(s => s.result.subjective && !s.result.subjective.allEvaluated).length;
-
   return `
     ${renderTopbar('admin')}
     <div class="app wide">
       ${selector}
+      ${statusTabs}
       <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)} — Evaluate Answers</h2>
-      <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${subs.length} submission${subs.length!==1?'s':''} · ${pendingCount} awaiting evaluation</p>
+      <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${filteredSubs.length} shown · ${pendingCount} awaiting evaluation overall</p>
       <div class="card" style="overflow:hidden;">
         <table class="admin-table">
           <thead><tr><th>Email</th><th>Submitted</th><th>Progress</th><th>Status</th><th></th></tr></thead>
@@ -1847,7 +1891,13 @@ async function goEvaluator(){
 function switchEvaluatorTest(testId){
   state.evaluatorTestId = testId;
   state.evaluatorSelectedIdx = null;
+  state.evaluatorStatusFilter = "pending";
   loadEvaluatorSubmissions();
+}
+
+function setEvaluatorStatusFilter(f){
+  state.evaluatorStatusFilter = f;
+  render();
 }
 
 async function loadEvaluatorSubmissions(){
