@@ -784,7 +784,7 @@ function renderTestSelect(){
       pill = `<span class="status-pill completed">Completed — ${st.sub.result.pct}%</span>`;
       actions = `
         <button class="btn btn-primary" onclick="viewPastResult('${testId}')">View my result</button>
-        <button class="btn btn-ghost" onclick="retakeTest('${testId}')">Retake</button>`;
+        ${test.allowRetake !== false ? `<button class="btn btn-ghost" onclick="retakeTest('${testId}')">Retake</button>` : ''}`;
     } else if (st.kind === 'in-progress'){
       const answered = Object.keys(st.prog.answers).length;
       pill = `<span class="status-pill in-progress">In progress — ${answered}/${total}</span>`;
@@ -1130,18 +1130,27 @@ function renderMyResults(){
     <div class="app wide">
       ${renderMyOverallSummary()}
       ${selector}
+      ${r.hasSubjective && !r.subjective.allEvaluated ? `
+        <div class="card pad" style="margin-bottom:16px;border-color:var(--amber);background:var(--amber-soft);">
+          <b>${r.subjective.questions.filter(q=>!q.evaluated).length} subjective question(s) awaiting evaluation</b> — the score below is provisional until an evaluator reviews your written answers.
+        </div>` : ''}
+      ${r.hasSubjective && r.subjective.allEvaluated ? `
+        <div class="card pad" style="margin-bottom:16px;border-color:var(--green);background:var(--green-soft);">
+          <b>Subjective answers evaluated</b> — you scored ${r.subjective.totalAwarded} / ${r.subjective.totalMax} on the written portion, included below.
+        </div>` : ''}
       <div class="card score-hero">
         ${renderGauge(r.pct)}
         <div class="score-side">
           <span class="badge ${r.pass?'pass':'fail'}">${r.pass?'Passed':'Needs Review'}</span>
-          <h2 style="margin-top:10px;">${escapeHtml(meta ? meta.name : state.myResultsTestId)} — ${r.correctCount} / ${r.total}</h2>
+          <h2 style="margin-top:10px;">${escapeHtml(meta ? meta.name : state.myResultsTestId)} — ${r.correctCount} / ${r.total}${r.hasSubjective && !r.subjective.allEvaluated ? ' (provisional)' : ''}</h2>
           <p>Completed ${fmtDate(r.timestamp)}</p>
           <button class="btn btn-ghost" style="margin-top:12px;" onclick="exportMyResultCSV()">⬇ Download my result (CSV)</button>
         </div>
       </div>
       ${renderBreakdown(r.sectionScores)}
-      <div class="section-title-row"><h3>Answer review</h3></div>
+      <div class="section-title-row"><h3>Answer review ${r.hasSubjective ? '(multiple-choice)' : ''}</h3></div>
       <div style="margin-top:14px;">${renderReviewList(r.perQuestion, 'all')}</div>
+      ${renderSubjectiveReviewSection(r)}
     </div>`;
 }
 
@@ -1322,12 +1331,15 @@ function renderEvaluator(){
   const completedCount = subs.filter(s => s.result.subjective && s.result.subjective.allEvaluated).length;
 
   const statusFilter = state.evaluatorStatusFilter || 'pending';
-  const filteredSubs = subs.filter(s => {
+  const statusFiltered = subs.filter(s => {
     const complete = s.result.subjective && s.result.subjective.allEvaluated;
     if (statusFilter === 'pending') return !complete;
     if (statusFilter === 'completed') return complete;
     return true;
   });
+
+  const allEmails = [...new Set(subs.map(s => s.name))].sort();
+  const filteredSubs = state.memberFilter.length ? statusFiltered.filter(s => state.memberFilter.includes(s.name)) : statusFiltered;
 
   const statusTabs = `
     <div class="test-tabs" style="margin:0 0 18px;">
@@ -1338,9 +1350,12 @@ function renderEvaluator(){
 
   if (filteredSubs.length === 0){
     return `${renderTopbar('admin')}<div class="app wide">
-      ${selector}
+      <div class="admin-controls-row">
+        ${selector}
+        ${renderMemberFilter(allEmails)}
+      </div>
       ${statusTabs}
-      <div class="empty-state card pad">No ${statusFilter === 'all' ? '' : statusFilter} submissions for "${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)}".</div>
+      <div class="empty-state card pad">No ${statusFilter === 'all' ? '' : statusFilter} submissions${state.memberFilter.length ? ' matching this member filter' : ''} for "${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)}".</div>
     </div>`;
   }
 
@@ -1364,7 +1379,10 @@ function renderEvaluator(){
   return `
     ${renderTopbar('admin')}
     <div class="app wide">
-      ${selector}
+      <div class="admin-controls-row">
+        ${selector}
+        ${renderMemberFilter(allEmails)}
+      </div>
       ${statusTabs}
       <h2 style="margin-bottom:4px;">${escapeHtml(testMeta ? testMeta.name : state.evaluatorTestId)} — Evaluate Answers</h2>
       <p style="color:var(--ink-mute);font-size:13.5px;margin-top:0;">${filteredSubs.length} shown · ${pendingCount} awaiting evaluation overall</p>
@@ -1871,6 +1889,8 @@ async function goEvaluatorEntry(){
 async function goEvaluator(){
   state.view = "evaluator";
   state.evaluatorSelectedIdx = null;
+  state.memberFilter = [];
+  state.memberFilterOpen = false;
   render();
 
   if (state.evaluatorCatalog.length === 0){
@@ -1892,6 +1912,8 @@ function switchEvaluatorTest(testId){
   state.evaluatorTestId = testId;
   state.evaluatorSelectedIdx = null;
   state.evaluatorStatusFilter = "pending";
+  state.memberFilter = [];
+  state.memberFilterOpen = false;
   loadEvaluatorSubmissions();
 }
 
